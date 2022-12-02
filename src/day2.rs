@@ -17,17 +17,18 @@ impl Move {
     }
     /// Play this move versus another move and return the score earned.
     fn versus(&self, other: &Self) -> u32 {
-        self.score() + match (self, other) {
-            (Move::Rock, Move::Rock) => 3,
-            (Move::Rock, Move::Paper) => 0,
-            (Move::Rock, Move::Scissors) => 6,
-            (Move::Paper, Move::Rock) => 6 ,
-            (Move::Paper, Move::Paper) => 3 ,
-            (Move::Paper, Move::Scissors) => 0,
-            (Move::Scissors, Move::Rock) => 0 ,
-            (Move::Scissors, Move::Paper) => 6 ,
-            (Move::Scissors, Move::Scissors) => 3,
-        } 
+        self.score()
+            + match (self, other) {
+                (Move::Rock, Move::Rock) => 3,
+                (Move::Rock, Move::Paper) => 0,
+                (Move::Rock, Move::Scissors) => 6,
+                (Move::Paper, Move::Rock) => 6,
+                (Move::Paper, Move::Paper) => 3,
+                (Move::Paper, Move::Scissors) => 0,
+                (Move::Scissors, Move::Rock) => 0,
+                (Move::Scissors, Move::Paper) => 6,
+                (Move::Scissors, Move::Scissors) => 3,
+            }
     }
 }
 
@@ -64,15 +65,15 @@ fn part1(guide: &Vec<(Move, Move)>) -> u32 {
 enum Outcome {
     Win,
     Lose,
-    Draw
+    Draw,
 }
 
 impl From<&str> for Outcome {
     fn from(value: &str) -> Self {
         match value {
-             "X" => Self::Lose,
-             "Y" => Self::Draw,
-             "Z" => Self::Win,
+            "X" => Self::Lose,
+            "Y" => Self::Draw,
+            "Z" => Self::Win,
             _ => panic!(),
         }
     }
@@ -99,11 +100,13 @@ fn part2_gen(input: &str) -> Vec<(Move, Outcome)> {
     let mut guide: Vec<(Move, Outcome)> = vec![];
     for line in input.lines() {
         let mut line_components = line.split_whitespace();
-        guide.push((line_components.next().unwrap().into(), line_components.next().unwrap().into()));
+        guide.push((
+            line_components.next().unwrap().into(),
+            line_components.next().unwrap().into(),
+        ));
     }
     guide
 }
-
 
 #[aoc(day2, part2)]
 fn part2(guide: &Vec<(Move, Outcome)>) -> u32 {
