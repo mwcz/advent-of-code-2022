@@ -23,8 +23,6 @@ pub fn part1_gen(input: &str) -> Packs {
         }
     }
 
-    packs.sort();
-
     packs
 }
 
