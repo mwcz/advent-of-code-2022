@@ -62,13 +62,17 @@ fn part1_solve(input: &str) -> usize {
     let rucksacks = parse(input);
 
     let mut priority_sum = 0;
+
     for rucksack in rucksacks.iter() {
-        // find the product of compartment 1's prime numbers, then check each of compartment 0's
-        // prime numbers to see if they evenly divide into compartment 1's product.
+        // find the product of compartment 1's prime numbers
         let compartment1_product: &BigUint = &rucksack
             .1
             .iter()
             .fold(BigUint::from(1u32), |acc, item| acc * item.0);
+
+        // check each of compartment 0's prime numbers to see if they evenly divide into
+        // compartment 1's product.  if they do, that's the prime corresponding to the item in both
+        // compartments.
         for (prime, priority) in &rucksack.0 {
             // if the prime evently divides into compartment 1's product, then the letter exists in
             // that compartment too, so it's what we're looking for.
@@ -83,7 +87,7 @@ fn part1_solve(input: &str) -> usize {
 }
 
 // #[aoc(day3, part2)]
-// fn part2_solve(rucksacks: &Rucksacks) -> u32 {
+// fn part2_solve(input: &str) -> usize {
 //     0
 // }
 
