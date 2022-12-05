@@ -31,7 +31,7 @@ fn prime(c: char) -> Item<'static> {
     let prime = &PRIMES[offset];
     let priority = offset + 1;
 
-    (prime, priority)
+    Item::new(prime, priority)
 }
 
 /// Each rucksack is represented as two compartments.
@@ -41,11 +41,21 @@ type Rucksack<'int> = (Compartment<'int>, Compartment<'int>);
 type Compartment<'int> = Vec<Item<'int>>;
 /// Each item is a prime number, plus its corresponding priority (to avoid having to look up
 /// priority later on).
-type Item<'int> = (&'int BigUint, usize);
+#[derive(Debug, PartialEq)]
+struct Item<'int> {
+    prime: &'int BigUint,
+    priority: usize,
+}
+
+impl<'int> Item<'int> {
+    fn new(prime: &'int BigUint, priority: usize) -> Self {
+        Self { prime, priority }
+    }
+}
 
 /// Parse the input.  Not using the generator because my parsing involves references.  See
 /// cargo-aoc issue #20 https://github.com/gobanos/cargo-aoc/issues/20
-fn parse(input: &str) -> Rucksacks {
+fn part1_parse(input: &str) -> Rucksacks {
     input
         .lines()
         .map(|line| {
@@ -57,27 +67,56 @@ fn parse(input: &str) -> Rucksacks {
         .collect()
 }
 
+/// Parse the input tailored for part 2.
+fn part2_parse(input: &str) -> Vec<Vec<Compartment>> {
+    input
+        .lines()
+        .collect::<Vec<&str>>()
+        .chunks(3)
+        .map(|chunk| -> Vec<Compartment> {
+            chunk
+                .iter()
+                .map(|line| line.chars().map(prime).collect::<Compartment>())
+                .collect()
+            // let comp0_primes: Compartment = comp_strs.0.chars().map(prime).collect();
+            // let comp1_primes: Compartment = comp_strs.1.chars().map(prime).collect();
+            // (comp0_primes, comp1_primes)
+        })
+        .collect()
+    // .map(|line| {
+    //     let comp_strs = line.split_at(line.len() / 2);
+    //     let comp0_primes: Compartment = comp_strs.0.chars().map(prime).collect();
+    //     let comp1_primes: Compartment = comp_strs.1.chars().map(prime).collect();
+    //     (comp0_primes, comp1_primes)
+    // })
+    // .collect()
+}
+
+/// For a given compartment, find the product of all the prime numbers contained in each Item.
+fn product(items: &Compartment) -> BigUint {
+    items
+        .iter()
+        .fold(BigUint::from(1u32), |acc, item| acc * item.prime)
+}
+
 #[aoc(day3, part1)]
 fn part1_solve(input: &str) -> usize {
-    let rucksacks = parse(input);
+    let rucksacks = part1_parse(input);
 
     let mut priority_sum = 0;
 
     for rucksack in rucksacks.iter() {
         // find the product of compartment 1's prime numbers
-        let compartment1_product: &BigUint = &rucksack
-            .1
-            .iter()
-            .fold(BigUint::from(1u32), |acc, item| acc * item.0);
+        let comp1_product = product(&rucksack.1);
 
         // check each of compartment 0's prime numbers to see if they evenly divide into
         // compartment 1's product.  if they do, that's the prime corresponding to the item in both
         // compartments.
-        for (prime, priority) in &rucksack.0 {
+        for item in &rucksack.0 {
             // if the prime evently divides into compartment 1's product, then the letter exists in
             // that compartment too, so it's what we're looking for.
-            if compartment1_product % *prime == BigUint::from(0u32) {
-                priority_sum += priority;
+            if &comp1_product % item.prime == BigUint::from(0u32) {
+                priority_sum += item.priority;
                 break;
             }
         }
@@ -86,10 +125,28 @@ fn part1_solve(input: &str) -> usize {
     priority_sum
 }
 
-// #[aoc(day3, part2)]
-// fn part2_solve(input: &str) -> usize {
-//     0
-// }
+#[aoc(day3, part2)]
+fn part2_solve(input: &str) -> usize {
+    let compartments = part2_parse(input);
+
+    let mut priority_sum = 0;
+
+    for triplet in compartments {
+        let comp0_product = product(&triplet[0]);
+        let comp1_product = product(&triplet[1]);
+
+        for item in &triplet[2] {
+            // if the prime evently divides into compartment 1's product, then the letter exists in
+            // that compartment too, so it's what we're looking for.
+            if &comp0_product % item.prime == BigUint::from(0u32) && &comp1_product % item.prime == BigUint::from(0u32) {
+                priority_sum += item.priority;
+                break;
+            }
+        }
+    }
+
+    priority_sum
+}
 
 #[cfg(test)]
 mod day3_tests {
@@ -97,10 +154,10 @@ mod day3_tests {
 
     #[test]
     fn prime_test() {
-        assert_eq!(prime('A'), (&BigUint::from(103u32), 27), "A");
-        assert_eq!(prime('Z'), (&BigUint::from(239u32), 52), "Z");
-        assert_eq!(prime('a'), (&BigUint::from(2u32), 1), "a");
-        assert_eq!(prime('z'), (&BigUint::from(101u32), 26), "z");
+        assert_eq!(prime('A'), Item::new(&BigUint::from(103u32), 27), "A");
+        assert_eq!(prime('Z'), Item::new(&BigUint::from(239u32), 52), "Z");
+        assert_eq!(prime('a'), Item::new(&BigUint::from(2u32), 1), "a");
+        assert_eq!(prime('z'), Item::new(&BigUint::from(101u32), 26), "z");
     }
 
     #[test]
@@ -115,6 +172,21 @@ ttgJtRGJQctTZtZT
 CrZsJsPPZsGzwwsLwLmpwMDw"
             ),
             157
+        );
+    }
+
+    #[test]
+    fn part2_solve_test() {
+        assert_eq!(
+            part2_solve(
+                "vJrwpWtwJgWrhcsFMMfFFhFp
+jqHRNqRjqzjGDLGLrsFMfFZSrLrFZsSL
+PmmdzqPrVvPwwTWBwg
+wMqvLMZHhHMvwLHjbvcjnnSBnvTQFn
+ttgJtRGJQctTZtZT
+CrZsJsPPZsGzwwsLwLmpwMDw"
+            ),
+            70
         );
     }
 }
