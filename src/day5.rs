@@ -1,13 +1,14 @@
+use std::collections::VecDeque;
+
 use aoc_runner_derive::{aoc, aoc_generator};
 
 #[derive(Debug, PartialEq)]
-pub struct Supplies {
+pub struct Supplies<const STACK_COUNT: usize> {
     stacks: Vec<Stack>,
     moves: Vec<Move>,
 }
 
-#[derive(Debug, PartialEq)]
-struct Stack(Vec<char>);
+type Stack = Vec<char>;
 
 #[derive(Debug, PartialEq)]
 struct Move {
@@ -22,34 +23,100 @@ impl From<&str> for Move {
         spl.next().unwrap(); // move
         let count = spl.next().unwrap().parse::<usize>().unwrap();
         spl.next().unwrap(); // from
-        let from = spl.next().unwrap().parse::<usize>().unwrap();
+        let from = spl.next().unwrap().parse::<usize>().unwrap() - 1;
         spl.next().unwrap(); // to
-        let to = spl.next().unwrap().parse::<usize>().unwrap();
+        let to = spl.next().unwrap().parse::<usize>().unwrap() - 1;
         Self { count, from, to }
     }
 }
 
-#[aoc_generator(day5)]
-pub fn parse(input: &str) -> Supplies {
-    let mut input_spl = input.split("\n\n");
+impl<const STACK_COUNT: usize> Supplies<STACK_COUNT> {
+    fn parse(input: &str) -> Supplies<STACK_COUNT> {
+        let mut input_spl = input.split("\n\n");
 
-    let stacks_input = input_spl.next().unwrap();
-    let moves_input = input_spl.next().unwrap();
+        let stacks_input = input_spl.next().unwrap();
+        let moves_input = input_spl.next().unwrap();
 
-    Supplies {
-        stacks: vec![],
-        moves: moves_input.lines().map(Move::from).collect()
+        let mut stack_lines = stacks_input.lines();
+
+        let mut stacks: Vec<Vec<char>> = vec![vec![]; STACK_COUNT];
+
+        stack_lines.for_each(|line| {
+            let mut chars = line.chars();
+            let mut stack: Stack = vec![];
+
+            chars.next(); // consume initial [
+
+            // if the first char of the line is 1, then we've reached the labels.  otherwise,
+            // document the stack items.
+            for (i, c) in chars.step_by(4).enumerate() {
+                if let 'A'..='Z' = c {
+                    // add the char to the beginning of the vec, since they're listed in reverse order
+                    stacks[i].insert(0, c);
+                }
+            }
+        });
+
+        Supplies {
+            stacks,
+            moves: moves_input.lines().map(Move::from).collect(),
+        }
+    }
+
+    fn rearrange_9000(&mut self) {
+        for mov in &self.moves {
+            for _ in 0..mov.count {
+                let from_crate = self.stacks[mov.from]
+                    .pop()
+                    .expect("can't move crate that doesn't exist");
+                self.stacks[mov.to].push(from_crate);
+            }
+        }
+    }
+
+    fn rearrange_9001(&mut self) {
+        for mov in &self.moves {
+            let from_len = self.stacks[mov.from].len();
+
+            // reverse the elements about to be moved
+            self.stacks[mov.from][from_len - mov.count..].reverse();
+
+            for _ in 0..mov.count {
+                let from_crate = self.stacks[mov.from]
+                    .pop()
+                    .expect("can't move crate that doesn't exist");
+                self.stacks[mov.to].push(from_crate);
+            }
+        }
+    }
+
+    fn top_crates(&self) -> [char; STACK_COUNT] {
+        let mut top_crates = [' '; STACK_COUNT];
+
+        for (i, stack) in self.stacks.iter().enumerate() {
+            top_crates[i] = *stack.last().expect("CRATERED!");
+        }
+
+        top_crates
     }
 }
 
 #[aoc(day5, part1)]
-fn part1_solve(pairs: &Supplies) -> usize {
-    todo!();
+fn part1_solve(input: &str) -> String {
+    let mut supplies = Supplies::<9>::parse(input);
+
+    supplies.rearrange_9000();
+
+    supplies.top_crates().iter().cloned().collect()
 }
 
 #[aoc(day5, part2)]
-fn part2_solve(pairs: &Supplies) -> usize {
-    todo!();
+fn part2_solve(input: &str) -> String {
+    let mut supplies = Supplies::<9>::parse(input);
+
+    supplies.rearrange_9001();
+
+    supplies.top_crates().iter().cloned().collect()
 }
 
 #[cfg(test)]
@@ -70,39 +137,20 @@ mod day5_tests {
     fn part1_parse_test() {
         #[rustfmt::skip]
         assert_eq!(
-            parse(SAMPLE_INPUT),
+            Supplies::parse::<3>(SAMPLE_INPUT),
             Supplies {
-                stacks: vec![],
+                stacks: vec![
+                    vec!['Z', 'N'],
+                    vec!['M', 'C', 'D'],
+                    vec!['P'],
+                ],
                 moves: vec![
-                    Move { count: 1, from: 2, to: 1 },
-                    Move { count: 3, from: 1, to: 3 },
-                    Move { count: 2, from: 2, to: 1 },
-                    Move { count: 1, from: 1, to: 2 },
+                    Move { count: 1, from: 1, to: 0 },
+                    Move { count: 3, from: 0, to: 2 },
+                    Move { count: 2, from: 1, to: 0 },
+                    Move { count: 1, from: 0, to: 1 },
                 ]
             }
         );
     }
-
-    // #[test]
-    // fn part1_solve_test() {
-    //     assert_eq!(
-    //         part1_solve(&parse(SAMPLE_INPUT)),
-    //         "CMZ"
-    //     );
-    // }
-
-    // #[test]
-    // fn part2_solve_test() {
-    //     assert_eq!(
-    //         part2_solve(&parse(
-    //             "2-4,6-8\n\
-    //             2-3,4-5\n\
-    //             5-7,7-9\n\
-    //             2-8,3-7\n\
-    //             6-6,4-6\n\
-    //             2-6,4-8"
-    //         )),
-    //         4
-    //     );
-    // }
 }
