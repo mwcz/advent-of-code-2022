@@ -1,6 +1,4 @@
-use std::collections::VecDeque;
-
-use aoc_runner_derive::{aoc, aoc_generator};
+use aoc_runner_derive::aoc;
 
 #[derive(Debug, PartialEq)]
 pub struct Supplies<const STACK_COUNT: usize> {
@@ -37,13 +35,12 @@ impl<const STACK_COUNT: usize> Supplies<STACK_COUNT> {
         let stacks_input = input_spl.next().unwrap();
         let moves_input = input_spl.next().unwrap();
 
-        let mut stack_lines = stacks_input.lines();
+        let stack_lines = stacks_input.lines();
 
         let mut stacks: Vec<Vec<char>> = vec![vec![]; STACK_COUNT];
 
         stack_lines.for_each(|line| {
             let mut chars = line.chars();
-            let mut stack: Stack = vec![];
 
             chars.next(); // consume initial [
 
@@ -137,7 +134,7 @@ mod day5_tests {
     fn part1_parse_test() {
         #[rustfmt::skip]
         assert_eq!(
-            Supplies::parse::<3>(SAMPLE_INPUT),
+            Supplies::<3>::parse(SAMPLE_INPUT),
             Supplies {
                 stacks: vec![
                     vec!['Z', 'N'],

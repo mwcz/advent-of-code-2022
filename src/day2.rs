@@ -57,7 +57,7 @@ fn part1_gen(input: &str) -> Vec<(Move, Move)> {
 fn part1(guide: &Vec<(Move, Move)>) -> u32 {
     let mut score = 0;
     for (theirs, yours) in guide {
-        score += yours.versus(&theirs);
+        score += yours.versus(theirs);
     }
     score
 }
@@ -113,7 +113,7 @@ fn part2(guide: &Vec<(Move, Outcome)>) -> u32 {
     let mut score = 0;
     for (theirs, outcome) in guide {
         let yours = outcome.choose(theirs);
-        score += yours.versus(&theirs);
+        score += yours.versus(theirs);
     }
     score
 }

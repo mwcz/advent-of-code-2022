@@ -3,7 +3,7 @@ use nom::bytes::complete::tag;
 use nom::character::complete::u32 as nomu32;
 use nom::combinator::map;
 use nom::{sequence::separated_pair, IResult};
-use std::ops::{Range, RangeInclusive};
+use std::ops::RangeInclusive;
 
 trait RangeTools {
     fn fully_contains(&self, other: &Self) -> bool;
@@ -21,11 +21,14 @@ impl RangeTools for RangeInclusive<u32> {
 
 #[aoc_generator(day4)]
 pub fn parse(input: &str) -> Vec<(RangeInclusive<u32>, RangeInclusive<u32>)> {
-    fn range(r: &str) -> IResult<&str, (u32, u32)> {
+    type ParseRange = (u32, u32);
+    type Line = (ParseRange, ParseRange);
+
+    fn range(r: &str) -> IResult<&str, ParseRange> {
         separated_pair(nomu32, tag("-"), nomu32)(r)
     }
 
-    fn line(line_str: &str) -> IResult<&str, ((u32, u32), (u32, u32))> {
+    fn line(line_str: &str) -> IResult<&str, Line> {
         separated_pair(range, tag(","), range)(line_str)
     }
 
@@ -44,12 +47,15 @@ pub fn parse(input: &str) -> Vec<(RangeInclusive<u32>, RangeInclusive<u32>)> {
 }
 
 #[aoc(day4, part1)]
-fn part1_solve(pairs: &Vec<(RangeInclusive<u32>, RangeInclusive<u32>)>) -> usize {
-    pairs.iter().filter(|pair| pair.0.fully_contains(&pair.1) || pair.1.fully_contains(&pair.0)).count()
+fn part1_solve(pairs: &[(RangeInclusive<u32>, RangeInclusive<u32>)]) -> usize {
+    pairs
+        .iter()
+        .filter(|pair| pair.0.fully_contains(&pair.1) || pair.1.fully_contains(&pair.0))
+        .count()
 }
 
 #[aoc(day4, part2)]
-fn part2_solve(pairs: &Vec<(RangeInclusive<u32>, RangeInclusive<u32>)>) -> usize {
+fn part2_solve(pairs: &[(RangeInclusive<u32>, RangeInclusive<u32>)]) -> usize {
     pairs.iter().filter(|pair| pair.0.overlaps(&pair.1)).count()
 }
 
