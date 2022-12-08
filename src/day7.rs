@@ -1,3 +1,7 @@
+mod parse;
+
+use std::{cell::RefCell, rc::Rc};
+
 use aoc_runner_derive::aoc;
 use nom::{
     bytes::complete::tag,
@@ -6,7 +10,6 @@ use nom::{
     sequence::tuple,
     IResult,
 };
-use patricia_tree::PatriciaMap;
 
 #[derive(Debug, PartialEq)]
 pub enum Entry<'name> {
@@ -16,119 +19,98 @@ pub enum Entry<'name> {
     Cd { name: &'name str },
 }
 
-mod parse {
-    use nom::{branch::alt, multi::separated_list0};
+type RcDir<'name> = Rc<RefCell<Dir<'name>>>;
+type RcFile<'name> = Rc<RefCell<File<'name>>>;
 
-    use super::*;
+#[derive(Debug, PartialEq)]
+struct Dir<'name> {
+    name: &'name str,
+    dirs: Vec<RcDir<'name>>,
+    files: Vec<RcFile<'name>>,
+    parent: Option<RcDir<'name>>,
+}
 
-    pub fn log(input: &str) -> IResult<&str, Vec<Entry>> {
-        separated_list0(newline, alt((ls, cd, file, dir)))(input)
+impl<'name> Dir<'name> {
+    /// Get a direct child dir by name.
+    fn get_dir(&self, name: &'name str) -> Option<&'name RcDir> {
+        self.dirs.iter().find(|&dir| dir.borrow().name == name)
     }
-
-    fn ls(input: &str) -> IResult<&str, Entry> {
-        map(tag("$ ls"), |_| Entry::Ls)(input)
+    fn add_dir(&mut self, parent: RcDir<'name>, name: &'name str) {
+        self.dirs.push(Rc::new(RefCell::new(Dir {
+            name,
+            dirs: vec![],
+            files: vec![],
+            parent: Some(parent),
+        })));
     }
-
-    fn cd(input: &str) -> IResult<&str, Entry> {
-        map(tuple((tag("$ cd "), not_line_ending)), |tup| Entry::Cd {
-            name: tup.1,
-        })(input)
-    }
-
-    fn file(input: &str) -> IResult<&str, Entry> {
-        map(tuple((nom_u32, space1, not_line_ending)), |tup| {
-            Entry::File {
-                name: tup.2,
-                size: tup.0,
-            }
-        })(input)
-    }
-
-    fn dir(input: &str) -> IResult<&str, Entry> {
-        map(tuple((tag("dir "), not_line_ending)), |tup| Entry::Dir {
-            name: tup.1,
-        })(input)
-    }
-
-    #[test]
-    fn parse_test() {
-        assert_eq!(ls("$ ls"), Ok(("", Entry::Ls)));
-        assert_eq!(cd("$ cd .."), Ok(("", Entry::Cd { name: ".." })));
-        #[rustfmt::skip]
-        assert_eq!(file("1234 foo.txt"), Ok(("", Entry::File { name: "foo.txt", size: 1234 })));
-        assert_eq!(dir("dir bar"), Ok(("", Entry::Dir { name: "bar" })));
-        assert_eq!(
-            log("$ ls\n\
-                 $ cd ..\n\
-                 1234 foo.txt\n\
-                 dir bar"),
-            Ok((
-                "",
-                vec![
-                    Entry::Ls,
-                    Entry::Cd { name: ".." },
-                    Entry::File {
-                        name: "foo.txt",
-                        size: 1234
-                    },
-                    Entry::Dir { name: "bar" }
-                ]
-            ))
-        );
+    fn add_file(&mut self, name: &'name str, size: u32) {
+        self.files.push(Rc::new(RefCell::new(File { name, size })));
     }
 }
 
 #[derive(Debug, PartialEq)]
-enum Inode<'name> {
-    Dir {
-        name: &'name str,
-        contents: Vec<Inode<'name>>,
-    },
-    File {
-        name: &'name str,
-        size: usize,
-    },
+struct File<'name> {
+    name: &'name str,
+    size: u32,
 }
 
 #[derive(Debug)]
-struct Device<'inode> {
+struct Filesystem<'inode> {
     cwd: Vec<&'inode str>,
-    tree: PatriciaMap<Inode<'inode>>,
+    root: RcDir<'inode>,
 }
 
-impl<'inode> Device<'inode> {
-    fn new() -> Device<'inode> {
-        Device {
-            cwd: vec![],
-            tree: PatriciaMap::new(),
-        }
-    }
+impl<'inode> Filesystem<'inode> {
+    fn new(entries: Vec<Entry<'inode>>) -> Filesystem<'inode> {
+        let root = Rc::new(RefCell::new(Dir {
+            name: "/",
+            dirs: vec![],
+            files: vec![],
+            parent: None,
+        }));
+        let mut cwd = root.clone();
 
-    fn sum_under(&mut self, entries: Vec<Entry<'inode>>, max: u32) -> u32 {
-        let mut sum = 0;
-        let mut dir_sum = 0;
         for entry in entries {
             match entry {
                 Entry::Cd { name } => {
-                    // if name == ".." {
-                    //     self.cwd.pop();
-                    // } else {
-                    //     self.cwd.push(name);
-                    // }
+                    if name == ".." {
+                        cwd = cwd
+                            .borrow()
+                            .parent
+                            .expect("can't move '..' from the root directory");
+                    } else {
+                        cwd = *cwd
+                            .borrow()
+                            .get_dir(name)
+                            .expect("tried to cd into a nonexistant dir");
+                    }
                 }
                 Entry::Ls => {}
                 Entry::Dir { name } => {
-                    if dir_sum <= max {
-                        sum += dir_sum;
-                    }
-                    dir_sum = 0;
-                    // self.tree.insert(name, Inode::Dir { name });
+                    cwd.borrow().add_dir(cwd, name);
                 }
                 Entry::File { name, size } => {
-                    dir_sum += size;
+                    cwd.borrow().add_file(name, size);
                 }
             }
         }
+
+        Filesystem { cwd: vec![], root }
+    }
+
+    /// Get the size of a file or total size of a directory.
+    fn stat(&self, path: Vec<&str>) -> Option<u32> {
+        let mut inode = &self.root;
+
+        for seg in path {
+            // if
+        }
+        todo!();
+    }
+
+    fn sum_under(&mut self, max: u32) -> u32 {
+        let mut sum = 0;
+        let mut dir_sum = 0;
 
         sum
     }
@@ -136,7 +118,7 @@ impl<'inode> Device<'inode> {
 
 #[test]
 fn day7_test() {
-    let ex = Device::new().sum_under(
+    let ex = Filesystem::new(
         parse::log(
             "$ cd /
 $ ls
@@ -162,19 +144,20 @@ $ ls
 5626152 d.ext
 7214296 k",
         )
-        .unwrap().1,
-        100000,
+        .unwrap()
+        .1,
     );
-    assert_eq!(ex, 95437);
+    // assert_eq!(ex, 95437);
 }
 
 #[aoc(day7, part1)]
 fn part1_solve(input: &str) -> u32 {
-    let (_, entries) = parse::log(input).expect("could not parse input");
+    // let (_, entries) = parse::log(input).expect("could not parse input");
 
-    let mut device = Device::new();
+    // let mut device = Filesystem::new();
 
-    device.sum_under(entries, 100000)
+    // device.sum_under(entries, 100000)
+    todo!();
 }
 
 // #[aoc(day7, part2)]
