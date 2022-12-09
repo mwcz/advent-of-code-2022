@@ -1,7 +1,5 @@
 mod parse;
 
-use std::{cell::RefCell, rc::Rc};
-
 use aoc_runner_derive::aoc;
 use nom::{
     bytes::complete::tag,
@@ -12,107 +10,130 @@ use nom::{
 };
 
 #[derive(Debug, PartialEq)]
-pub enum Entry<'name> {
+pub enum Log<'name> {
     Dir { name: &'name str },
     File { name: &'name str, size: u32 },
     Ls,
     Cd { name: &'name str },
 }
 
-type RcDir<'name> = Rc<RefCell<Dir<'name>>>;
-type RcFile<'name> = Rc<RefCell<File<'name>>>;
-
 #[derive(Debug, PartialEq)]
-struct Dir<'name> {
+struct Inode<'name> {
     name: &'name str,
-    dirs: Vec<RcDir<'name>>,
-    files: Vec<RcFile<'name>>,
-    parent: Option<RcDir<'name>>,
-}
-
-impl<'name> Dir<'name> {
-    /// Get a direct child dir by name.
-    fn get_dir(&self, name: &'name str) -> Option<&'name RcDir> {
-        self.dirs.iter().find(|&dir| dir.borrow().name == name)
-    }
-    fn add_dir(&mut self, parent: RcDir<'name>, name: &'name str) {
-        self.dirs.push(Rc::new(RefCell::new(Dir {
-            name,
-            dirs: vec![],
-            files: vec![],
-            parent: Some(parent),
-        })));
-    }
-    fn add_file(&mut self, name: &'name str, size: u32) {
-        self.files.push(Rc::new(RefCell::new(File { name, size })));
-    }
-}
-
-#[derive(Debug, PartialEq)]
-struct File<'name> {
-    name: &'name str,
+    /// The size of the inode.  0 for dirs, >0 for files.
     size: u32,
+    /// The size of all the contents of this inode (for dirs).
+    content_size: u32,
+    /// The index of the parent inode.  Only the root node has None.
+    parent: Option<usize>,
+    /// The index of this inode in the inode table.
+    idx: usize,
 }
 
 #[derive(Debug)]
 struct Filesystem<'inode> {
-    cwd: Vec<&'inode str>,
-    root: RcDir<'inode>,
+    inodes: Vec<Inode<'inode>>,
+    // /// Cache of dir sizes (recursive).  Inode index -> u32 size.
+    // dir_sizes: Vec<(usize, u32)>,
 }
 
 impl<'inode> Filesystem<'inode> {
-    fn new(entries: Vec<Entry<'inode>>) -> Filesystem<'inode> {
-        let root = Rc::new(RefCell::new(Dir {
-            name: "/",
-            dirs: vec![],
-            files: vec![],
-            parent: None,
-        }));
-        let mut cwd = root.clone();
+    fn new(logs: Vec<Log<'inode>>) -> Filesystem<'inode> {
+        let mut cwd: usize = 0;
 
-        for entry in entries {
-            match entry {
-                Entry::Cd { name } => {
+        let mut fs = Filesystem {
+            inodes: vec![],
+            // dir_sizes: vec![],
+        };
+
+        for log in logs {
+            match log {
+                Log::Cd { name } => {
                     if name == ".." {
-                        cwd = cwd
-                            .borrow()
-                            .parent
-                            .expect("can't move '..' from the root directory");
+                        if let Some(parent) = fs.get_inode(Some(cwd)).unwrap().parent {
+                            cwd = parent;
+                        }
                     } else {
-                        cwd = *cwd
-                            .borrow()
-                            .get_dir(name)
-                            .expect("tried to cd into a nonexistant dir");
+                        match fs.get_inode_in(name, cwd) {
+                            Some(inode) => cwd = inode.idx,
+                            None => cwd = fs.add_inode(name, 0, Some(cwd)),
+                        }
                     }
                 }
-                Entry::Ls => {}
-                Entry::Dir { name } => {
-                    cwd.borrow().add_dir(cwd, name);
+                Log::Ls => {}
+                Log::Dir { name } => {
+                    fs.add_inode(name, 0, Some(cwd));
                 }
-                Entry::File { name, size } => {
-                    cwd.borrow().add_file(name, size);
+                Log::File { name, size } => {
+                    fs.add_inode(name, size, Some(cwd));
                 }
             }
         }
 
-        Filesystem { cwd: vec![], root }
+        let total_size = fs.dir_size(None);
+        println!("{}", total_size);
+
+        fs
     }
 
-    /// Get the size of a file or total size of a directory.
-    fn stat(&self, path: Vec<&str>) -> Option<u32> {
-        let mut inode = &self.root;
-
-        for seg in path {
-            // if
-        }
-        todo!();
+    /// Add an inode.  Returns the index.
+    fn add_inode(&mut self, name: &'inode str, size: u32, parent: Option<usize>) -> usize {
+        let idx = self.inodes.len();
+        // mark the root inode as having no parent
+        let parent = if name == "/" { None } else { parent };
+        self.inodes.push(Inode {
+            name,
+            size,
+            parent,
+            idx,
+            content_size: 0,
+        });
+        idx
     }
 
-    fn sum_under(&mut self, max: u32) -> u32 {
-        let mut sum = 0;
-        let mut dir_sum = 0;
+    fn get_inode(&self, idx: Option<usize>) -> Option<&Inode<'inode>> {
+        self.inodes.get(idx.unwrap_or(0))
+    }
 
-        sum
+    fn get_inode_in(&self, name: &str, in_dir: usize) -> Option<&Inode<'inode>> {
+        self.inodes
+            .iter()
+            .find(|inode| inode.parent == Some(in_dir) && inode.name == name)
+    }
+
+    fn dir_size(&self, idx: Option<usize>) -> u32 {
+        let (dirs, files): (Vec<_>, Vec<_>) = self
+            .inodes
+            .iter()
+            .filter(|inode| inode.parent == idx)
+            .partition(|inode| inode.size == 0);
+
+        let files_size = files.iter().map(|file| file.size).sum::<u32>();
+
+        // cache the dir size
+        // self.dir_sizes.push((idx.unwrap_or(0), files_size));
+
+        let dirs_size = dirs
+            .iter()
+            .map(|dir| self.dir_size(Some(dir.idx)))
+            .sum::<u32>();
+
+        files_size + dirs_size
+    }
+
+    fn sum_under(&self, max: u32) -> u32 {
+        self.inodes
+            .iter()
+            .filter_map(|inode| {
+                if inode.size == 0 {
+                    let dir_size = self.dir_size(Some(inode.idx));
+                    if dir_size <= max {
+                        return Some(dir_size);
+                    }
+                }
+                None
+            })
+            .sum()
     }
 }
 
@@ -147,17 +168,16 @@ $ ls
         .unwrap()
         .1,
     );
-    // assert_eq!(ex, 95437);
+    assert_eq!(ex.sum_under(100000), 95437);
 }
 
 #[aoc(day7, part1)]
 fn part1_solve(input: &str) -> u32 {
-    // let (_, entries) = parse::log(input).expect("could not parse input");
+    let (_, entries) = parse::log(input).expect("could not parse input");
 
-    // let mut device = Filesystem::new();
+    let device = Filesystem::new(entries);
 
-    // device.sum_under(entries, 100000)
-    todo!();
+    device.sum_under(100000)
 }
 
 // #[aoc(day7, part2)]
