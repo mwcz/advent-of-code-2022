@@ -135,6 +135,44 @@ impl<'inode> Filesystem<'inode> {
             })
             .sum()
     }
+
+    fn used_space(&self) -> u32 {
+        self.dir_size(self.inodes.iter().find(|&inode| inode.name == "/").map(|inode| inode.idx))
+    }
+
+    fn free_up(&self, total: u32, needed: u32) -> Option<u32> {
+        let used = self.used_space();
+
+        self.inodes
+            .iter()
+            .filter_map(|inode| {
+                if inode.size == 0 {
+                    let dir_size = self.dir_size(Some(inode.idx));
+                    if total - (used - dir_size) > needed {
+                        return Some(dir_size);
+                    }
+                }
+                None
+            }).min()
+    }
+}
+
+#[aoc(day7, part1)]
+fn part1_solve(input: &str) -> u32 {
+    let (_, entries) = parse::log(input).expect("could not parse input");
+
+    let fs = Filesystem::new(entries);
+
+    fs.sum_under(100000)
+}
+
+#[aoc(day7, part2)]
+fn part2_solve(input: &str) -> u32 {
+    let (_, entries) = parse::log(input).expect("could not parse input");
+
+    let fs = Filesystem::new(entries);
+
+    fs.free_up(70_000_000, 30_000_000).expect("no dir found that can free up enough space")
 }
 
 #[test]
@@ -171,94 +209,3 @@ $ ls
     assert_eq!(ex.sum_under(100000), 95437);
 }
 
-#[aoc(day7, part1)]
-fn part1_solve(input: &str) -> u32 {
-    let (_, entries) = parse::log(input).expect("could not parse input");
-
-    let device = Filesystem::new(entries);
-
-    device.sum_under(100000)
-}
-
-// #[aoc(day7, part2)]
-// fn part2_solve(input: &str) -> usize {
-// }
-
-// #[derive(Debug, PartialEq)]
-// struct Device<'dir> {
-//     cwd: Dir<'dir>,
-// }
-
-// #[derive(Debug, PartialEq)]
-// struct File<'name> {
-//     name: &'name str,
-//     size: u32,
-// }
-
-// #[derive(Debug, PartialEq)]
-// enum Command<'dir> {
-//     Cd(DirMove<'dir>),
-//     Ls,
-// }
-
-// impl<'com> TryFrom<&'com str> for Command<'com> {
-//     type Error = ();
-
-//     fn try_from(value: &'com str) -> Result<Self, Self::Error> {
-//         let mut words = value.split_whitespace();
-
-//         if let Some(command_name) = words.next() {
-//             match command_name {
-//                 "cd" => {
-//                     if let Some(dir) = words.next() {
-//                         Ok(Command::Cd(dir.into()))
-//                     } else {
-//                         Err(())
-//                     }
-//                 }
-//                 "ls" => Ok(Command::Ls),
-//                 _ => Err(()),
-//             }
-//         } else {
-//             Err(())
-//         }
-//     }
-// }
-
-// #[derive(Debug, PartialEq)]
-// enum DirMove<'path> {
-//     Path(&'path str),
-//     Up,
-// }
-
-// impl<'dir> From<&'dir str> for DirMove<'dir> {
-//     fn from(value: &'dir str) -> Self {
-//         match value {
-//             ".." => DirMove::Up,
-//             _ => DirMove::Path(value),
-//         }
-//     }
-// }
-
-// #[derive(Debug, PartialEq)]
-// struct Dir<'name> {
-//     name: &'name str,
-//     files: Vec<File<'name>>,
-// }
-
-// #[cfg(test)]
-// mod day7_tests {
-//     use super::*;
-
-//     #[test]
-//     fn parse_test() {
-//         assert_eq!(DirMove::from(".."), DirMove::Up);
-//         assert_eq!(DirMove::from("foo"), DirMove::Path("foo"));
-//         assert_eq!(Command::try_from("ls"), Ok(Command::Ls));
-//         assert_eq!(Command::try_from("cd .."), Ok(Command::Cd(DirMove::Up)));
-//         assert_eq!(
-//             Command::try_from("cd foo"),
-//             Ok(Command::Cd(DirMove::Path("foo")))
-//         );
-//     }
-// }
