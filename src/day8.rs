@@ -88,16 +88,46 @@ impl<const SIZE: usize> Forest<SIZE> {
             + (SIZE - 1) * 4
     }
 
-    fn get(&self, row: usize, col: usize) -> i8 {
-        let Some(row) = self.trees.get(row) else {
-            return -1;
-        };
+    fn max_scenic(&self) -> usize {
+        let mut score = 0;
+        for y in 1..(SIZE - 1) {
+            for x in 1..(SIZE - 1) {
+                score = score.max(self.scenic_score(x, y));
+            }
+        }
+        score
+    }
 
-        let Some(tree) = row.get(col) else {
-            return -1;
-        };
-
-        *tree
+    fn scenic_score(&self, x: usize, y: usize) -> usize {
+        // top right bottom left
+        let mut scores = [0, 0, 0, 0];
+        let mut height = self.trees[y][x];
+        // left
+        for left_idx in (0..x).rev() {
+            scores[3] += 1;
+            if self.trees[y][left_idx] >= height {
+                break;
+            }
+        }
+        for right_idx in (x+1)..SIZE {
+            scores[1] += 1;
+            if self.trees[y][right_idx] >= height {
+                break;
+            }
+        }
+        for top_idx in (0..y).rev() {
+            scores[0] += 1;
+            if self.trees[top_idx][x] >= height {
+                break;
+            }
+        }
+        for bottom_idx in (y+1)..SIZE {
+            scores[2] += 1;
+            if self.trees[bottom_idx][x] >= height {
+                break;
+            }
+        }
+        scores.iter().product()
     }
 }
 
@@ -111,8 +141,12 @@ fn part1_solve(input: &str) -> usize {
 }
 
 #[aoc(day8, part2)]
-fn part2_solve(input: &str) -> u32 {
-    todo!();
+fn part2_solve(input: &str) -> usize {
+    let forest = Forest::<99> {
+        trees: parse::<99>(input),
+        visible: [[false; 99]; 99],
+    };
+    forest.max_scenic()
 }
 
 #[test]
@@ -146,5 +180,19 @@ fn day8_test() {
         }
         .count_visible(),
         21
+    );
+    assert_eq!(
+        Forest::<5> {
+            trees: parse::<5>(
+                "30373\n\
+             25512\n\
+             65332\n\
+             33549\n\
+             35390",
+            ),
+            visible: [[false; 5]; 5],
+        }
+        .max_scenic(),
+        8
     );
 }
