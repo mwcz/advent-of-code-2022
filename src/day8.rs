@@ -101,7 +101,7 @@ impl<const SIZE: usize> Forest<SIZE> {
     fn scenic_score(&self, x: usize, y: usize) -> usize {
         // top right bottom left
         let mut scores = [0, 0, 0, 0];
-        let mut height = self.trees[y][x];
+        let height = self.trees[y][x];
         // left
         for left_idx in (0..x).rev() {
             scores[3] += 1;

@@ -242,7 +242,5 @@ addx -11
 noop
 noop
 noop";
-    let mut dev = Device::new(ex.lines());
-
     assert_eq!(part1_solve(ex), 13140);
 }
