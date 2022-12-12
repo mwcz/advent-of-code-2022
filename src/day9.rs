@@ -2,13 +2,6 @@ use std::collections::HashMap;
 
 use aoc_runner_derive::aoc;
 
-enum Move {
-    Up,
-    Down,
-    Left,
-    Right,
-}
-
 #[aoc(day9, part1)]
 fn part1_solve(input: &str) -> usize {
     let mut hx = 0;
