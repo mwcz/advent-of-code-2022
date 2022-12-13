@@ -1,26 +1,29 @@
-use std::ops::{Add, Mul};
-use num_bigint::BigUint;
-
 use aoc_runner_derive::aoc;
 
 struct Monkey {
     items: Vec<Item>,
     op: Operation,
     test: Test,
-    items_seen: BigUint,
+    items_seen: u64,
+}
+
+enum MathOp {
+    Mul,
+    Add,
 }
 
 struct Operation {
-    op: fn(BigUint, BigUint) -> BigUint,
+    op: MathOp,
     /// None implies "old"
-    value: Option<BigUint>,
+    value: Option<u64>,
 }
 #[derive(Clone)]
 struct Item {
-    worry: BigUint,
+    id: u8,
+    worry: u64,
 }
 struct Test {
-    div: BigUint,
+    div: u64,
     if_true: usize,
     if_false: usize,
 }
@@ -30,6 +33,8 @@ impl From<&str> for Monkey {
         let mut lines = value.lines();
         lines.next().unwrap(); // discard monkey label
 
+        let mut item_id = 0;
+
         let items: Vec<Item> = lines
             .next()
             .unwrap()
@@ -37,8 +42,12 @@ impl From<&str> for Monkey {
             .last()
             .unwrap()
             .split(",")
-            .map(|n| Item {
-                worry: n.trim().parse::<BigUint>().unwrap(),
+            .map(|n| {
+                item_id += 1;
+                Item {
+                    worry: n.trim().parse::<u64>().unwrap(),
+                    id: item_id,
+                }
             })
             .collect();
 
@@ -46,11 +55,11 @@ impl From<&str> for Monkey {
 
         let op_val = match op.next().unwrap() {
             "old" => None,
-            n => n.parse::<BigUint>().ok(),
+            n => n.parse::<u64>().ok(),
         };
         let op_op = match op.next().unwrap() {
-            "*" => BigUint::mul,
-            _ => BigUint::add,
+            "*" => MathOp::Mul,
+            _ => MathOp::Add,
         };
 
         let div = lines
@@ -59,7 +68,7 @@ impl From<&str> for Monkey {
             .split_whitespace()
             .last()
             .unwrap()
-            .parse::<BigUint>()
+            .parse::<u64>()
             .unwrap();
 
         let if_true = lines
@@ -80,7 +89,7 @@ impl From<&str> for Monkey {
             .unwrap();
 
         Monkey {
-            items,
+            items: items.into_iter().collect(),
             op: Operation {
                 op: op_op,
                 value: op_val,
@@ -90,53 +99,38 @@ impl From<&str> for Monkey {
                 if_true,
                 if_false,
             },
-            items_seen: BigUint::from(0u8),
+            items_seen: 0,
         }
     }
 }
 
 #[aoc(day11, part1)]
-fn part1_solve(input: &str) -> BigUint {
+fn part1_solve(input: &str) -> u64 {
     let mut monkeys: Vec<Monkey> = input.split("\n\n").map(|line| Monkey::from(line)).collect();
     let mut airborne: Vec<Vec<Item>> = vec![vec![]; monkeys.len()];
+
+    let three = 3;
 
     for _ in 1..=20 {
         for (monkey_idx, monkey) in monkeys.iter_mut().enumerate() {
             monkey.items.append(&mut airborne[monkey_idx]);
             for _ in 0..monkey.items.len() {
                 let mut item = monkey.items.remove(0);
-                monkey.items_seen += BigUint::from(1u8);
-                item.worry = (monkey.op.op)(item.worry.clone(), monkey.op.value.as_ref().unwrap_or(&item.worry).clone()) / BigUint::from(3u8);
-                if &item.worry % &monkey.test.div == BigUint::from(0u8) {
-                    airborne[monkey.test.if_true].push(item.clone());
-                } else {
-                    airborne[monkey.test.if_false].push(item);
-                }
-            }
-        }
-    }
+                monkey.items_seen += 1;
+                item.worry = match monkey.op.op {
+                    MathOp::Mul => match &monkey.op.value {
+                        Some(val) => item.worry * val,
+                        None => item.worry * item.worry,
+                    },
+                    MathOp::Add => match &monkey.op.value {
+                        Some(val) => item.worry + val,
+                        None => unreachable!(),
+                    },
+                };
 
-    monkeys.sort_by(|a, b| b.items_seen.cmp(&a.items_seen));
+                item.worry /= &three;
 
-    monkeys[0..=1]
-        .iter()
-        .map(|monkey| monkey.items_seen.clone())
-        .product()
-}
-
-#[aoc(day11, part2)]
-fn part2_solve(input: &str) -> BigUint {
-    let mut monkeys: Vec<Monkey> = input.split("\n\n").map(|line| Monkey::from(line)).collect();
-    let mut airborne: Vec<Vec<Item>> = vec![vec![]; monkeys.len()];
-
-    for _round in 1..=10000 {
-        for (monkey_idx, monkey) in monkeys.iter_mut().enumerate() {
-            monkey.items.append(&mut airborne[monkey_idx]);
-            for _ in 0..monkey.items.len() {
-                let mut item = monkey.items.remove(0);
-                monkey.items_seen += BigUint::from(1u8);
-                item.worry = (monkey.op.op)(item.worry.clone(), monkey.op.value.as_ref().unwrap_or(&item.worry).clone());
-                if &item.worry % &monkey.test.div == BigUint::from(0u8) {
+                if &item.worry % &monkey.test.div == 0 {
                     airborne[monkey.test.if_true].push(item);
                 } else {
                     airborne[monkey.test.if_false].push(item);
@@ -149,7 +143,57 @@ fn part2_solve(input: &str) -> BigUint {
 
     monkeys[0..=1]
         .iter()
-        .map(|monkey| monkey.items_seen.clone())
+        .map(|monkey| &monkey.items_seen)
+        .product()
+}
+
+#[aoc(day11, part2)]
+fn part2_solve(input: &str) -> u64 {
+    let mut monkeys: Vec<Monkey> = input.split("\n\n").map(|line| Monkey::from(line)).collect();
+    let mut airborne: Vec<Vec<Item>> = vec![vec![]; monkeys.len()];
+
+    let max: u64 = monkeys.iter().map(|m| &m.test.div).product();
+
+    for _round in 1..=10000 {
+        // println!("round {}", round);
+        for (monkey_idx, monkey) in monkeys.iter_mut().enumerate() {
+            monkey.items.append(&mut airborne[monkey_idx]);
+            for _ in 0..monkey.items.len() {
+                let mut item = monkey.items.remove(0);
+                monkey.items_seen += 1;
+                item.worry = match monkey.op.op {
+                    MathOp::Mul => match &monkey.op.value {
+                        Some(val) => item.worry*val,
+                        None => item.worry * item.worry,
+                    },
+                    MathOp::Add => match &monkey.op.value {
+                        Some(val) => item.worry+val,
+                        None => {
+                            unreachable!();
+                        }
+                    },
+                };
+
+                item.worry %= &max;
+
+                if &item.worry % &monkey.test.div == 0 {
+                    // item.worry /= &monkey.test.div;
+                    println!("item {} to monkey {}", item.id, monkey.test.if_true);
+                    airborne[monkey.test.if_true].push(item);
+                } else {
+                    // item.worry %= &monkey.test.div;
+                    println!("item {} to monkey {}", item.id, monkey.test.if_false);
+                    airborne[monkey.test.if_false].push(item);
+                }
+            }
+        }
+    }
+
+    monkeys.sort_by(|a, b| b.items_seen.cmp(&a.items_seen));
+
+    monkeys[0..=1]
+        .iter()
+        .map(|monkey| &monkey.items_seen)
         .product()
 }
 
@@ -186,11 +230,11 @@ Monkey 3:
     If false: throw to monkey 1";
     #[test]
     fn part1_test() {
-        assert_eq!(part1_solve(EX), BigUint::from(10605u32));
+        assert_eq!(part1_solve(EX), 10605u64);
     }
 
     #[test]
     fn part2_test() {
-        assert_eq!(part2_solve(EX), BigUint::from(2713310158u64));
+        assert_eq!(part2_solve(EX), 2713310158u64);
     }
 }
