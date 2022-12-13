@@ -83,7 +83,7 @@ fn part2_solve(input: &str) -> usize {
             }
 
             for i in 0..(segs.len() - 1) {
-                let head = segs.get(i).unwrap().clone();
+                let head = *segs.get(i).unwrap();
                 let tail = segs.get_mut(i + 1).unwrap();
 
                 match (head.0 - tail.0, head.1 - tail.1) {

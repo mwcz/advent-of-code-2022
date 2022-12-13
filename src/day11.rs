@@ -19,7 +19,6 @@ struct Operation {
 }
 #[derive(Clone)]
 struct Item {
-    id: u8,
     worry: u64,
 }
 struct Test {
@@ -33,20 +32,16 @@ impl From<&str> for Monkey {
         let mut lines = value.lines();
         lines.next().unwrap(); // discard monkey label
 
-        let mut item_id = 0;
-
         let items: Vec<Item> = lines
             .next()
             .unwrap()
-            .split(":")
+            .split(':')
             .last()
             .unwrap()
-            .split(",")
+            .split(',')
             .map(|n| {
-                item_id += 1;
                 Item {
                     worry: n.trim().parse::<u64>().unwrap(),
-                    id: item_id,
                 }
             })
             .collect();
@@ -106,7 +101,7 @@ impl From<&str> for Monkey {
 
 #[aoc(day11, part1)]
 fn part1_solve(input: &str) -> u64 {
-    let mut monkeys: Vec<Monkey> = input.split("\n\n").map(|line| Monkey::from(line)).collect();
+    let mut monkeys: Vec<Monkey> = input.split("\n\n").map(Monkey::from).collect();
     let mut airborne: Vec<Vec<Item>> = vec![vec![]; monkeys.len()];
 
     let three = 3;
@@ -130,7 +125,7 @@ fn part1_solve(input: &str) -> u64 {
 
                 item.worry /= &three;
 
-                if &item.worry % &monkey.test.div == 0 {
+                if item.worry % monkey.test.div == 0 {
                     airborne[monkey.test.if_true].push(item);
                 } else {
                     airborne[monkey.test.if_false].push(item);
@@ -149,13 +144,12 @@ fn part1_solve(input: &str) -> u64 {
 
 #[aoc(day11, part2)]
 fn part2_solve(input: &str) -> u64 {
-    let mut monkeys: Vec<Monkey> = input.split("\n\n").map(|line| Monkey::from(line)).collect();
+    let mut monkeys: Vec<Monkey> = input.split("\n\n").map(Monkey::from).collect();
     let mut airborne: Vec<Vec<Item>> = vec![vec![]; monkeys.len()];
 
     let max: u64 = monkeys.iter().map(|m| &m.test.div).product();
 
     for _round in 1..=10000 {
-        // println!("round {}", round);
         for (monkey_idx, monkey) in monkeys.iter_mut().enumerate() {
             monkey.items.append(&mut airborne[monkey_idx]);
             for _ in 0..monkey.items.len() {
@@ -176,13 +170,11 @@ fn part2_solve(input: &str) -> u64 {
 
                 item.worry %= &max;
 
-                if &item.worry % &monkey.test.div == 0 {
+                if item.worry % monkey.test.div == 0 {
                     // item.worry /= &monkey.test.div;
-                    println!("item {} to monkey {}", item.id, monkey.test.if_true);
                     airborne[monkey.test.if_true].push(item);
                 } else {
                     // item.worry %= &monkey.test.div;
-                    println!("item {} to monkey {}", item.id, monkey.test.if_false);
                     airborne[monkey.test.if_false].push(item);
                 }
             }

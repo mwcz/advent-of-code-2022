@@ -26,7 +26,7 @@ fn prime(c: char) -> Item<'static> {
     let offset = match c {
         'a'..='z' => c as usize - LOWER_OFFSET,
         'A'..='Z' => c as usize - CAPS_OFFSET,
-        _ => panic!("non-alpha character {}", c),
+        _ => panic!("non-alpha character {c}"),
     };
     let prime = &PRIMES[offset];
     let priority = offset + 1;

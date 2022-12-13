@@ -71,7 +71,7 @@ impl<'inode> Filesystem<'inode> {
         }
 
         let total_size = fs.dir_size(None);
-        println!("{}", total_size);
+        println!("{total_size}");
 
         fs
     }
