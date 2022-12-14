@@ -1,6 +1,5 @@
 use aoc_runner_derive::aoc;
-use petgraph::algo::{astar, dijkstra, k_shortest_path};
-use petgraph::dot::{Dot, Config};
+use petgraph::algo::astar;
 use petgraph::graph::NodeIndex;
 use petgraph::Graph;
 
@@ -70,13 +69,7 @@ fn part1_solve(input: &str) -> i32 {
     let start = grid[start_idx.0][start_idx.1];
     let end = grid[end_idx.0][end_idx.1];
 
-    let path = astar(
-        &graph,
-        start,
-        |finish| finish == end,
-        |_| 1,
-        |_| 1,
-    );
+    let path = astar(&graph, start, |finish| finish == end, |_| 1, |_| 1);
 
     path.unwrap().0
 }
@@ -146,13 +139,7 @@ fn part2_solve(input: &str) -> i32 {
     for node_idx in graph.node_indices() {
         let node = graph[node_idx];
         if node.2 == START_HEIGHT {
-            let path = astar(
-                &graph,
-                node_idx,
-                |finish| finish == end,
-                |_| 1,
-                |_| 1,
-            );
+            let path = astar(&graph, node_idx, |finish| finish == end, |_| 1, |_| 1);
 
             if let Some(path) = path {
                 dists.push(path.0);
