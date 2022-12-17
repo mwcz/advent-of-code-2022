@@ -1,18 +1,103 @@
 use aoc_runner_derive::aoc;
-use petgraph::algo::astar;
-use petgraph::graph::NodeIndex;
-use petgraph::Graph;
+use petgraph::{prelude::*, dot::{Dot, Config}};
 
-#[derive(Debug, PartialEq, Eq)]
+#[derive(Debug)]
+struct Cave<'name> {
+    graph: DiGraphMap<ValveData<'name>, u16>,
+}
+
+impl<'input> Cave<'input> {
+    fn new(valves: Vec<Valve<'input>>) -> Self {
+        let mut cave = Self {
+            graph: DiGraphMap::new(),
+        };
+
+        // add valve nodes
+
+        for valve in &valves {
+            let exits = valve.exits.iter().filter_map(|e| valves.iter().find(|v| e == v.data.name));
+            for exit in exits {
+                cave.add_tunnel(&valve.data, &exit.data);
+            }
+        }
+
+        cave
+    }
+
+    fn add_tunnel(&mut self, from: &ValveData<'input>, to: &ValveData<'input>) {
+        self.graph.add_node(*from);
+        self.graph.add_node(*to);
+
+        self.graph.add_edge(*from, *to, 1);
+    }
+
+    // fn add_valve(&mut self, valve: Valve<'input>) {
+    //     self.graph.add_node(valve);
+    // }
+
+    // fn add_tunnel(&mut self, valve_idx: NodeIndex, exit_idx: NodeIndex, cost: u16) -> EdgeIndex {
+    //     self.graph.add_edge(valve_idx, exit_idx, cost)
+    // }
+
+    // fn get_valve_by_name(&self, name: &'input str) -> &Valve {
+    //     self.graph
+    //         .node_weights()
+    //         .find(|weight| weight.name == name)
+    //         .unwrap()
+    // }
+
+    // fn get_node_by_name(&self, name: &'input str) -> NodeIndex {
+    //     self.graph
+    //         .node_indices()
+    //         .find(|idx| self.graph[*idx].name == name)
+    //         .unwrap()
+    // }
+
+    // fn get_valve(&self, idx: NodeIndex) -> Option<&Valve<'input>> {
+    //     self.graph.node_weight(idx)
+    // }
+
+    // fn dig_tunnels(&mut self) {
+    //     // add edges
+
+    //     let mut tunnels: Vec<(NodeIndex, NodeIndex)> = vec![];
+
+    //     for valve in self.graph.node_weights() {
+    //         let valve_idx = self.get_node_by_name(valve.name);
+    //         if let Some(exits) = &valve.exits {
+    //             for exit in exits {
+    //                 tunnels.push((valve_idx, *exit));
+    //             }
+    //         }
+    //     }
+    //     for tunnel in tunnels {
+    //         self.add_tunnel(tunnel.0, tunnel.1, 1);
+    //     }
+    // }
+}
+
+#[derive(Debug)]
 struct Valve<'name> {
+    data: ValveData<'name>,
+    exits: Vec<String>,
+}
+
+#[derive(PartialEq, Eq, Hash, PartialOrd, Ord, Copy, Clone)]
+struct ValveData<'name> {
     name: &'name str,
     rate: u16,
-    exits: Vec<&'name str>,
+}
+
+impl<'name> std::fmt::Debug for ValveData<'name> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_fmt(format_args!("{}-{}", self.name, self.rate))
+    }
 }
 
 #[aoc(day16, part1)]
 fn part1_solve(input: &str) -> usize {
     let mut valves = vec![];
+
     for line in input.lines() {
         let mut words = line.split_whitespace();
         let name = words.nth(1).unwrap();
@@ -26,15 +111,18 @@ fn part1_solve(input: &str) -> usize {
         words.nth(3).unwrap(); // "tunnels lead to valve"
         let mut exits = vec![];
         while let Some(word) = words.next() {
-            exits.push(word);
+            exits.push(word.replace(",", ""));
         }
-        let valve = Valve { name, rate, exits };
+        let valve = Valve {
+            data: ValveData { name, rate },
+            exits,
+        };
         valves.push(valve);
     }
 
-    let mut graph = Graph::new();
+    let cave = Cave::new(valves);
 
-    for 
+    println!("{:?}", Dot::with_config(&cave.graph, &[Config::EdgeNoLabel]));
 
     todo!();
 }
