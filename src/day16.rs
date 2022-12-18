@@ -1,9 +1,8 @@
 use aoc_runner_derive::aoc;
-use petgraph::{
-    algo::floyd_warshall,
-    dot::{Config, Dot},
-    prelude::*,
-};
+use petgraph::dot::Dot;
+use petgraph::prelude::*;
+
+const START: &str = "AA";
 
 #[derive(Debug)]
 struct Valve<'name> {
@@ -25,19 +24,19 @@ impl<'name> std::fmt::Debug for ValveData<'name> {
 
 #[derive(Debug)]
 struct Cave<'name> {
-    graph: DiGraphMap<ValveData<'name>, u16>,
+    graph: UnGraphMap<ValveData<'name>, u16>,
 }
 
 impl<'input> Cave<'input> {
     fn new(valves: Vec<Valve<'input>>) -> Self {
         let mut cave = Self {
-            graph: DiGraphMap::new(),
+            graph: UnGraphMap::new(),
         };
 
         // add valve nodes
 
         for valve in &valves {
-            if valve.data.name != "AA" && valve.data.rate == 0 {
+            if valve.data.name != START && valve.data.rate == 0 {
                 continue;
             }
             let exits = valve
@@ -52,10 +51,14 @@ impl<'input> Cave<'input> {
         cave
     }
 
-    fn add_tunnel(&mut self, from: &ValveData<'input>, to: &Valve<'input>, valves: &Vec<Valve<'input>>, visited: &mut Vec<&'input str>) {
+    fn add_tunnel(
+        &mut self,
+        from: &ValveData<'input>,
+        to: &Valve<'input>,
+        valves: &Vec<Valve<'input>>,
+        visited: &mut Vec<&'input str>,
+    ) {
         self.graph.add_node(*from);
-
-        const START: &str = "AA";
 
         // collapse all 0-rate valves except the starting point
         if to.data.rate == 0 && to.data.name != START {
