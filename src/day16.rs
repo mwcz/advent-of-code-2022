@@ -1,6 +1,8 @@
 use aoc_runner_derive::aoc;
+use petgraph::algo::{k_shortest_path, dijkstra};
 use petgraph::dot::Dot;
 use petgraph::prelude::*;
+use petgraph::visit::Visitable;
 
 const START: &str = "AA";
 
@@ -25,17 +27,22 @@ impl<'name> std::fmt::Debug for ValveData<'name> {
 #[derive(Debug)]
 struct Cave<'name> {
     graph: UnGraphMap<ValveData<'name>, u16>,
+    start: Option<ValveData<'name>>,
 }
 
 impl<'input> Cave<'input> {
     fn new(valves: Vec<Valve<'input>>) -> Self {
         let mut cave = Self {
             graph: UnGraphMap::new(),
+            start: None,
         };
 
         // add valve nodes
 
         for valve in &valves {
+            if valve.data.name == START {
+                cave.start = Some(valve.data);
+            }
             if valve.data.name != START && valve.data.rate == 0 {
                 continue;
             }
@@ -78,6 +85,110 @@ impl<'input> Cave<'input> {
             self.graph.add_edge(*from, to.data, visited.len() as u16);
         }
     }
+
+    fn scan(
+        &self,
+        start: ValveData<'input>,
+        total_time: u16,
+    ) /*-> (ValveData<'input>, Vec<ValveData<'input>>, u16) */
+    {
+        let sum_of_all_nodes = self.graph.nodes().map(|v| v.rate).sum::<u16>();
+        let mut closed: Vec<ValveData> = vec![];
+        let mut released = 0;
+        let mut current: ValveData<'input> = start;
+        let mut time_left = total_time;
+
+        struct Visit<'input> {
+            /// The valve to visit
+            valve: ValveData<'input>,
+            /// Cost of traveling to the valve
+            cost: u16,
+            /// The value of opening the valve based on how much time will be left once you get
+            /// there and open it times its rate.
+            value: u16,
+        }
+
+        // set the initial "best" option as just staying here and doing nothing
+        let mut best = Visit {
+            valve: start,
+            cost: 1,
+            value: 0,
+        };
+
+        'outer: loop {
+            // the rates of all open valves added up
+            let opportunity_cost = sum_of_all_nodes - closed.iter().map(|v| v.rate).sum::<u16>();
+
+            if opportunity_cost == 0 {
+                // all nodes are open, spin down and exit
+                for _ in 0..time_left {
+                    released += sum_of_all_nodes;
+                    break 'outer;
+                }
+            }
+
+            let visits = dijkstra(&self.graph, current, None,|e| {
+                // the cost of visiting teach node is the distance to it (edge weight) plus the
+                // opportunity cost of not opening all the other open nodes
+                let weight = 100 * *e.weight();
+                let rate = e.target().rate;
+                // weight staying in place as a very high cost even
+                weight + opportunity_cost - rate
+                    // TODO this cost function doesn't adequately weight he cost of travel.
+            });
+
+            // evaluate next visit
+            for visit in &visits {
+                // skip already opened valves or when visiting the current node
+                if closed.contains(visit.0) || visit.0 == &current {
+                    continue;
+                }
+                // let cost = (*visit.1 + visit.0.rate) - opportunity_cost;
+                let cost = (*visit.1 + visit.0.rate - opportunity_cost) / 100;
+                // if we have time to get there _and_ do something (the + 1)
+                if let Some(new_time_left) = time_left.checked_sub(cost + 1) {
+                    let visit_value = Self::value(visit.0, new_time_left);
+                    if visit_value > best.value {
+                        best = Visit {
+                            valve: *visit.0,
+                            cost,
+                            value: visit_value,
+                        };
+                    }
+                }
+            }
+
+            // all potential visits evaluated, now visit the best one
+            println!("move from {:?} to {:?} and open it ({} minutes)", current, best.valve, best.cost + 1);
+            current = best.valve;
+            time_left -= best.cost + 1; // cost plus opening time
+            closed.push(current);
+
+            // update released pressure corresponding to travel time
+            released += (best.cost+1) * closed.iter().map(|v| v.rate).sum::<u16>();
+
+            // reset cost and value so once we've visited everything and can't move anymore, we
+            // don't get stuck updating the time with an old cost
+            best.cost = 1;
+            best.value = 0;
+
+            if time_left == 0 {
+                break;
+            }
+        }
+
+        println!("{:#?}", released);
+    }
+
+    // fn best_move(&self, node: ValveData<'input>) -> ValveData<'input> {
+    //     // look up to 5 nodes away and add up
+    // }
+
+    /// How much pressure will be released by this node if the open command is issued when the
+    /// given amount of time is remaining.
+    fn value(node: &ValveData<'input>, time_left: u16) -> u16 {
+        node.rate * (time_left - 1)
+    }
 }
 
 #[aoc(day16, part1)]
@@ -108,7 +219,11 @@ fn part1_solve(input: &str) -> usize {
 
     let cave = Cave::new(valves);
 
-    println!("{:?}", Dot::with_config(&cave.graph, &[]));
+    // println!("{:?}", Dot::with_config(&cave.graph, &[]));
+
+    if let Some(start) = cave.start {
+        cave.scan(start, 30);
+    }
 
     todo!();
 }
