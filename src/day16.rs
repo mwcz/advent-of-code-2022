@@ -1,8 +1,8 @@
 use aoc_runner_derive::aoc;
 use itertools::Itertools;
-use petgraph::algo::{dijkstra, floyd_warshall};
-use petgraph::dot::Dot;
+use petgraph::algo::floyd_warshall;
 use petgraph::prelude::*;
+use rayon::prelude::*;
 use std::collections::HashMap;
 
 const START: &str = "AA";
@@ -126,21 +126,27 @@ impl<'input> Cave<'input> {
         let paths = self
             .graph
             .nodes()
-            .filter(|valve| {
-                valve.name != start.name
-            })
-            .permutations(self.graph.node_count() - 1 /* since start is omitted */);
+            .filter(|valve| valve.name != start.name)
+            .permutations(
+                self.graph.node_count() - 1, /* since start is omitted */
+            )
+            .par_bridge();
 
-        // for path in paths {
-        //     println!("{:?} -> {}", path, self.path_score(&path, start, total_time));
-        // }
-
-        paths.map(|path| self.path_score(&path, start, total_time)).max().unwrap_or(0)
+        paths
+            .map(|path| self.path_score(&path, start, total_time))
+            .max()
+            .unwrap_or(0)
     }
 
-    fn path_score(&self, path: &Vec<ValveData<'input>>, start: ValveData<'input>, total_time: u32) -> u32 {
+    fn path_score(
+        &self,
+        path: &Vec<ValveData<'input>>,
+        start: ValveData<'input>,
+        total_time: u32,
+    ) -> u32 {
         // initialize these starting values by "visiting" the first valve in the path
         let path_str: Vec<&str> = path.iter().map(|valve| valve.name).collect();
+        println!("{:?}", path_str);
         let mut time_left = Some(total_time - self.dist(start, *path.first().unwrap()) - 1);
         let mut pressure_per_minute = path.first().unwrap().rate;
         let mut score = 0;
@@ -173,7 +179,6 @@ impl<'input> Cave<'input> {
             if time_left.is_none() {
                 break;
             }
-
         }
 
         // visited everything and time remains?  spin down the clock.
@@ -184,135 +189,6 @@ impl<'input> Cave<'input> {
         score
     }
 
-    // fn scan(&mut self, start: ValveData<'input>, total_time: u32)
-    // /*-> (ValveData<'input>, Vec<ValveData<'input>>, u32) */
-    // {
-    //     // let sum_of_all_rates = self.graph.nodes().map(|v| v.rate).sum::<u32>();
-    //     let mut released = 0;
-    //     let mut current: ValveData<'input> = start;
-    //     let mut time_left = total_time;
-
-    //     struct Visit<'input> {
-    //         /// The valve to visit
-    //         valve: ValveData<'input>,
-    //         /// Cost of traveling to the valve
-    //         cost: u32,
-    //         value: u32,
-    //     }
-
-    //     // set the initial "best" option as just staying here and doing nothing
-    //     let mut best = Visit {
-    //         valve: start,
-    //         cost: 1,
-    //         value: u32::MAX,
-    //     };
-
-    //     loop {
-    //         // if all valves are opened, spin down the remaining time
-    //         if self.opened.len() == self.graph.nodes().len() {
-    //             released += time_left * self.opened.iter().map(|v| v.rate).sum::<u32>();
-    //             break;
-    //         }
-
-    //         static DIJKSTRA_OFFSET: u32 = u32::MAX/3;
-
-    //         let visits = dijkstra(&self.graph, current, None, |e| {
-    //             DIJKSTRA_OFFSET - self.value(e.source(), e.target(), time_left).unwrap_or(0)
-    //         });
-
-    //         // evaluate next visit
-    //         for visit in &visits {
-    //             // don't consider already opened valves or when visiting the current valve
-    //             // if self.opened.contains(visit.0) || visit.0 == &current {
-    //             //     continue;
-    //             // }
-
-    //             let cost = *self
-    //                 .dists
-    //                 .as_ref()
-    //                 .unwrap()
-    //                 .get(&(current, *visit.0))
-    //                 .unwrap();
-
-    //             if let Some(new_time_left) = time_left.checked_sub(cost + 1) {
-    //                 // recover the value from the dijkstrafied value
-    //                 let recovered_value = DIJKSTRA_OFFSET - *visit.1;
-    //                 if recovered_value > best.value {
-    //                     best = Visit {
-    //                         valve: *visit.0,
-    //                         cost,
-    //                         value: recovered_value,
-    //                     };
-    //                 }
-    //             }
-    //         }
-
-    //         // all potential visits evaluated, now visit the best one
-    //         println!(
-    //             "move from {:?} to {:?} and open it ({} minutes)",
-    //             current,
-    //             best.valve,
-    //             best.cost + 1
-    //         );
-    //         current = best.valve;
-
-    //         // subtract travel cost plus opening time
-    //         let Some(new_time_left) = time_left.checked_sub(best.cost + 1) else {
-    //             break;
-    //         };
-    //         time_left = new_time_left;
-
-    //         self.opened.push(current);
-
-    //         // update released pressure corresponding to travel time
-    //         released += (best.cost + 1) * self.opened.iter().map(|v| v.rate).sum::<u32>();
-
-    //         // reset cost and value so once we've visited everything and can't move anymore, we
-    //         // don't get stuck updating the time with an old cost
-    //         best.cost = 1;
-    //         best.value = u32::MAX;
-
-    //         if time_left == 0 {
-    //             break;
-    //         }
-    //     }
-
-    //     println!("{:#?}", released);
-    // }
-
-    // A heuristic for how much value can be gained, starting at the given time, by moving from
-    // current valve to target valve and activating the target valve.
-    fn value(
-        &self,
-        current: ValveData<'input>,
-        target: ValveData<'input>,
-        time_left: u32,
-    ) -> Option<u32> {
-        let travel_time = self.dist(current, target);
-        let potential = self.release_potential_with_travel(current, travel_time, time_left);
-        let proximate_potential = self.proximate_values(target, travel_time, time_left);
-        Some(potential + proximate_potential)
-    }
-
-    /// How much pressure will be released by this valve if the open command is issued when the
-    /// given amount of time is remaining.
-    fn release_potential(&self, valve: ValveData<'input>, time_left: u32) -> u32 {
-        // subtract 1 minute for opening the valve, then compute pressure release
-        valve.rate * time_left.checked_sub(1).unwrap_or(0)
-    }
-
-    /// If we're at the given current valve, and at `time_left` we decide to travel to the given
-    /// target valve and activate it, how much pressure will be relased by the end of time?
-    fn release_potential_with_travel(
-        &self,
-        target: ValveData<'input>,
-        travel_time: u32,
-        time_left: u32,
-    ) -> u32 {
-        let time_left_at_arrival = time_left.checked_sub(travel_time).unwrap_or(0);
-        self.release_potential(target, time_left_at_arrival)
-    }
-
     /// Get the travel distance from one valve to another.
     fn dist(&self, current: ValveData<'input>, target: ValveData<'input>) -> u32 {
         *self
@@ -321,23 +197,6 @@ impl<'input> Cave<'input> {
             .unwrap()
             .get(&(current, target))
             .expect("distance missing")
-    }
-
-    /// A heuristic estimating how much value a given valve has due only to its proximity to other
-    /// high-value (ie, high pressure-release potential) valves.
-    fn proximate_values(&self, valve: ValveData<'input>, travel_time: u32, time_left: u32) -> u32 {
-        self.graph
-            .nodes()
-            .filter_map(|other_valve| {
-                // consider only valves that are still closed
-                if self.opened.contains(&other_valve) {
-                    None
-                } else {
-                    // TODO this is recursive for now... put a limit on recursion if it's too slow
-                    Some(self.release_potential_with_travel(other_valve, travel_time, time_left))
-                }
-            })
-            .sum::<u32>()
     }
 }
 
@@ -395,7 +254,7 @@ Valve JJ has flow rate=21; tunnel leads to valve II";
 
     #[test]
     fn part1_test() {
-        // AA DD BB JJ HH EE CC 
+        // AA DD BB JJ HH EE CC
         assert_eq!(part1_solve(EX), 1651);
     }
 
