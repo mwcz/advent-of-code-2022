@@ -182,7 +182,7 @@ impl<'input> Cave<'input> {
         rate: u32,
         pressure_released: u32,
     ) -> (Vec<ValveData>, u32) {
-        let path_str: Vec<&str> = tagged.iter().map(|valve| valve.name).collect();
+        // let path_str: Vec<&str> = activated.iter().map(|valve| valve.name).collect();
 
         let mut remaining_time = remaining_time;
         let mut pressure_released = pressure_released;
@@ -190,8 +190,50 @@ impl<'input> Cave<'input> {
         let mut players = players.clone();
         let mut activated = activated.clone();
 
+        // Tedious recursive debugging assist for the example input to make a breakpoint along the
+        // best path.
+        //
+        // const FIRST: &str = "DD";
+        // const SECOND: &str = "JJ";
+        // const THIRD: &str = "BB";
+        // const FOURTH: &str = "HH";
+        // const FIFTH: &str = "CC";
+        // const SIXTH: &str = "EE";
+        // if 
+        //     // (activated.len() == 1 && activated[0].name == FIRST)
+        //     // || (activated.len() == 2 && activated[0].name == FIRST && activated[1].name == SECOND) ||
+        //     // (activated.len() == 3
+        //     //     && activated[0].name == FIRST
+        //     //     && activated[1].name == SECOND
+        //     //     && activated[2].name == THIRD) ||
+        //     (activated.len() == 4
+        //         && activated[0].name == FIRST
+        //         && activated[1].name == SECOND
+        //         && activated[2].name == THIRD
+        //         && activated[3].name == FOURTH)
+        //     || (activated.len() == 5
+        //         && activated[0].name == FIRST
+        //         && activated[1].name == SECOND
+        //         && activated[2].name == THIRD
+        //         && activated[3].name == FOURTH
+        //         && activated[4].name == FIFTH)
+        //     || (activated.len() == 6
+        //         && activated[0].name == FIRST
+        //         && activated[1].name == SECOND
+        //         && activated[2].name == THIRD
+        //         && activated[3].name == FOURTH
+        //         && activated[4].name == FIFTH
+        //         && activated[5].name == SIXTH)
+        // {
+        //     println!("PAUSE");
+        // }
+
         // if both players have nowhere else to go
-        if players[0].position.name != START && players[0].dest.is_none() && players[1].position.name != START && players[1].dest.is_none() {
+        if players[0].position.name != START
+            && players[0].dest.is_none()
+            && players[1].position.name != START
+            && players[1].dest.is_none()
+        {
             pressure_released += rate * remaining_time;
             return (activated, pressure_released);
         }
@@ -257,46 +299,50 @@ impl<'input> Cave<'input> {
         // get the highest score from each of the paths
 
         if let Some(max) = closed_valves
-            .filter_map(|valve| {
+            .map(|valve| {
                 // println!("{:?}", path_str);
-                let _p = &path_str; // capture for debugging
-                let mut new_visited = tagged.clone();
+                // let _p = &path_str; // capture for debugging
+                let mut tagged = tagged.clone();
                 let mut players = players.clone();
                 let activated = activated.clone();
                 let ttm = self.dist(players[moving_player].position, valve) + 1; // 1 is for activation
 
-                if ttm < remaining_time {
-                    players[moving_player].ttm = ttm;
-                    players[moving_player].dest = Some(valve); // assign their next location; player
-                                                               // will arrive when ttm reaches 0
-                    new_visited.push(valve); // mark the player's next destination as visited so the
-                                             // other player doesn't try to go there too
-
-                    Some(self.visit2(
-                        new_visited,
-                        activated,
-                        remaining_time,
-                        total_time,
-                        players,
-                        rate,
-                        pressure_released,
-                    ))
-                } else {
-                    None
-                }
+                players[moving_player].ttm = ttm;
+                players[moving_player].dest = Some(valve); // assign their next location; player
+                                                           // will arrive when ttm reaches 0
+                tagged.push(valve); // mark the player's next destination as visited so the
+                                    // other player doesn't try to go there too
+                self.visit2(
+                    tagged,
+                    activated,
+                    remaining_time,
+                    total_time,
+                    players,
+                    rate,
+                    pressure_released,
+                )
             })
             .max_by(|a, b| {
-                let astr: Vec<&str> = a.0.iter().map(|valve| valve.name).collect();
-                let bstr: Vec<&str> = b.0.iter().map(|valve| valve.name).collect();
-                println!("{:?} -> {}", astr.join(" "), a.1);
-                println!("{:?} -> {}", bstr.join(" "), b.1);
+                // let astr: Vec<&str> = a.0.iter().map(|valve| valve.name).collect();
+                // let bstr: Vec<&str> = b.0.iter().map(|valve| valve.name).collect();
+                // println!("{:?} -> {}", astr.join(" "), a.1);
+                // println!("{:?} -> {}", bstr.join(" "), b.1);
                 a.1.cmp(&b.1)
             })
         {
+            println!("{} <- {:?}", pressure_released, activated.iter().map(|v| v.name).collect::<Vec<&str>>());
             return max;
         } else {
             // pressure_released += rate * remaining_time;
-            return (activated, pressure_released);
+            self.visit2(
+                tagged,
+                activated,
+                remaining_time,
+                total_time,
+                players,
+                rate,
+                pressure_released,
+            )
         }
     }
 
