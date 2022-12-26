@@ -265,7 +265,7 @@ impl Iterator for Chamber<'_> {
 fn part1_solve(input: &str) -> usize {
     let mut chamber = Chamber::new(input);
 
-    let ans = chamber.nth(2022).unwrap();
+    let ans = chamber.nth(1).unwrap();
 
     println!("{}", chamber.to_string(None));
 
