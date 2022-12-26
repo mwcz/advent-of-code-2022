@@ -1,6 +1,8 @@
 use aoc_runner_derive::aoc;
+use itertools::Itertools;
 use petgraph::algo::floyd_warshall;
 use petgraph::prelude::*;
+use rayon::prelude::{ParallelBridge, ParallelIterator};
 use std::collections::HashMap;
 
 const START: &str = "AA";
@@ -16,6 +18,7 @@ struct Valve<'name> {
 struct ValveData<'name> {
     name: &'name str,
     rate: u32,
+    mask: u32,
 }
 
 impl<'name> std::fmt::Debug for ValveData<'name> {
@@ -136,13 +139,19 @@ impl<'input> Cave<'input> {
         }
     }
 
-    fn visit(&self, visited: Vec<ValveData<'input>>, remaining_time: u32, total_time: u32) -> u32 {
+    fn visit(
+        &self,
+        visited: Vec<ValveData<'input>>,
+        paths: &mut HashMap<Vec<ValveData<'input>>, u32>,
+        remaining_time: u32,
+        total_time: u32,
+    ) -> Vec<(Vec<ValveData<'input>>, u32)> {
         let path_str: Vec<&str> = visited.iter().map(|valve| valve.name).collect();
         // println!("{:?} @ {} minutes", path_str, remaining_time);
         // if we're done visiting stuff, return the score of the path we took
         if total_time == 0 || visited.len() == self.graph.nodes().len() {
             // AA DD BB JJ HH EE CC
-            return self.path_score(&visited, total_time);
+            return vec![(visited.to_vec(), self.path_score(&visited, total_time))];
         }
 
         // visit every node that hasn't been visited already
@@ -157,19 +166,29 @@ impl<'input> Cave<'input> {
                 .map(|arrival_time| (valve, arrival_time))
         });
 
-        // get the highest score from each of the paths
-        if let Some(max) = valves_to_visit_at
-            .map(|(valve, arrival_time)| {
-                let mut new_visited = visited.clone();
-                new_visited.push(valve);
-                self.visit(new_visited, arrival_time, total_time)
-            })
-            .max()
-        {
-            return max;
-        } else {
-            return self.path_score(&visited, total_time);
+        for (valve, arrival_time) in valves_to_visit_at {
+            let mut new_visited = visited.clone();
+            new_visited.push(valve);
+            let score = self.path_score(&new_visited, total_time);
+            // println!("{} -> {}", score, new_visited.iter().map(|n| n.name).join(", "));
+            paths.entry(new_visited.clone()).or_insert(score);
+
+            // paths.(new_visited);
+            self.visit(new_visited, paths, arrival_time, total_time);
         }
+
+        // // get the highest score from each of the paths
+        // valves_to_visit_at
+        //     .map(|(valve, arrival_time)| {
+        //         let mut new_visited = visited.clone();
+        //         new_visited.push(valve);
+        //         self.visit(new_visited, paths, arrival_time, total_time)
+        //     })
+        //     .for_each(|v| {
+        //         paths.extend(v.into_iter());
+        //     });
+
+        paths.clone().into_iter().collect_vec()
     }
 
     fn visit2(
@@ -182,51 +201,12 @@ impl<'input> Cave<'input> {
         rate: u32,
         pressure_released: u32,
     ) -> (Vec<ValveData>, u32) {
-        // let path_str: Vec<&str> = activated.iter().map(|valve| valve.name).collect();
 
         let mut remaining_time = remaining_time;
         let mut pressure_released = pressure_released;
         let mut rate = rate;
         let mut players = players.clone();
         let mut activated = activated.clone();
-
-        // Tedious recursive debugging assist for the example input to make a breakpoint along the
-        // best path.
-        //
-        // const FIRST: &str = "DD";
-        // const SECOND: &str = "JJ";
-        // const THIRD: &str = "BB";
-        // const FOURTH: &str = "HH";
-        // const FIFTH: &str = "CC";
-        // const SIXTH: &str = "EE";
-        // if 
-        //     // (activated.len() == 1 && activated[0].name == FIRST)
-        //     // || (activated.len() == 2 && activated[0].name == FIRST && activated[1].name == SECOND) ||
-        //     // (activated.len() == 3
-        //     //     && activated[0].name == FIRST
-        //     //     && activated[1].name == SECOND
-        //     //     && activated[2].name == THIRD) ||
-        //     (activated.len() == 4
-        //         && activated[0].name == FIRST
-        //         && activated[1].name == SECOND
-        //         && activated[2].name == THIRD
-        //         && activated[3].name == FOURTH)
-        //     || (activated.len() == 5
-        //         && activated[0].name == FIRST
-        //         && activated[1].name == SECOND
-        //         && activated[2].name == THIRD
-        //         && activated[3].name == FOURTH
-        //         && activated[4].name == FIFTH)
-        //     || (activated.len() == 6
-        //         && activated[0].name == FIRST
-        //         && activated[1].name == SECOND
-        //         && activated[2].name == THIRD
-        //         && activated[3].name == FOURTH
-        //         && activated[4].name == FIFTH
-        //         && activated[5].name == SIXTH)
-        // {
-        //     println!("PAUSE");
-        // }
 
         // if both players have nowhere else to go
         if players[0].position.name != START
@@ -300,8 +280,6 @@ impl<'input> Cave<'input> {
 
         if let Some(max) = closed_valves
             .map(|valve| {
-                // println!("{:?}", path_str);
-                // let _p = &path_str; // capture for debugging
                 let mut tagged = tagged.clone();
                 let mut players = players.clone();
                 let activated = activated.clone();
@@ -323,14 +301,14 @@ impl<'input> Cave<'input> {
                 )
             })
             .max_by(|a, b| {
-                // let astr: Vec<&str> = a.0.iter().map(|valve| valve.name).collect();
-                // let bstr: Vec<&str> = b.0.iter().map(|valve| valve.name).collect();
-                // println!("{:?} -> {}", astr.join(" "), a.1);
-                // println!("{:?} -> {}", bstr.join(" "), b.1);
                 a.1.cmp(&b.1)
             })
         {
-            println!("{} <- {:?}", pressure_released, activated.iter().map(|v| v.name).collect::<Vec<&str>>());
+            println!(
+                "{} <- {:?}",
+                pressure_released,
+                activated.iter().map(|v| v.name).collect::<Vec<&str>>()
+            );
             return max;
         } else {
             // pressure_released += rate * remaining_time;
@@ -425,7 +403,7 @@ fn part1_solve(input: &str) -> u32 {
             exits.push(word.replace(",", ""));
         }
         let valve = Valve {
-            data: ValveData { name, rate },
+            data: ValveData { name, rate, mask: 0 },
             exits,
         };
         valves.push(valve);
@@ -437,7 +415,10 @@ fn part1_solve(input: &str) -> u32 {
 
     if let Some(start) = cave.start {
         // return cave.scan(start, 30);
-        cave.visit(vec![start], 30, 30)
+        let mut answer = HashMap::new();
+        let path_scores = cave.visit(vec![start], &mut answer, 30, 30);
+        println!("{:?}", path_scores);
+        path_scores.into_iter().map(|p| p.1).max().unwrap()
     } else {
         0
     }
@@ -446,6 +427,8 @@ fn part1_solve(input: &str) -> u32 {
 #[aoc(day16, part2)]
 fn part2_solve(input: &str) -> u32 {
     let mut valves = vec![];
+
+    let mut valve_count = 0;
 
     for line in input.lines() {
         let mut words = line.split_whitespace();
@@ -462,11 +445,14 @@ fn part2_solve(input: &str) -> u32 {
         while let Some(word) = words.next() {
             exits.push(word.replace(",", ""));
         }
+
         let valve = Valve {
-            data: ValveData { name, rate },
+            data: ValveData { name, rate, mask: 1 << valve_count },
             exits,
         };
         valves.push(valve);
+
+        valve_count += 1;
     }
 
     let cave = Cave::new(valves);
@@ -474,17 +460,32 @@ fn part2_solve(input: &str) -> u32 {
     // println!("{:?}", Dot::with_config(&cave.graph, &[]));
 
     if let Some(start) = cave.start {
-        let (path, score) = cave.visit2(
-            vec![start],
-            vec![],
-            26,
-            26,
-            vec![Player::new(start), Player::new(start)],
-            0,
-            0,
-        );
+        // return cave.scan(start, 30);
+        let mut paths = HashMap::new();
+        let path_scores = cave.visit(vec![start], &mut paths, 26, 26);
+        println!("{:#?}", path_scores);
 
-        println!("{:#?}", path);
+        let mut score = 0;
+
+        for (path1, score1) in &path_scores {
+            println!("hi {}", path1.iter().map(|n| n.name).join(", "));
+            // for (path2, score2) in &path_scores {
+            //     // make sure the paths have no valves in common
+            //     let disjoint = path1
+            //         .iter()
+            //         .filter(|v| v.name != START)
+            //         .all(|v| {
+            //             !path2.contains(v)
+            //         });
+
+            //     if disjoint {
+            //         score = score.max(score1 + score2);
+            //     }
+            //     // for valve in &path1 {
+            //     // }
+            // }
+        }
+
         score
     } else {
         0
