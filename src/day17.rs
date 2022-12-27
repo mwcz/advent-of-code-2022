@@ -1,5 +1,5 @@
 use std::{
-    collections::VecDeque,
+    collections::{VecDeque, HashMap},
     iter::{Cycle, Enumerate},
     slice::Iter,
     str::Chars,
@@ -7,7 +7,7 @@ use std::{
 
 use aoc_runner_derive::aoc;
 
-const HASH_SIZE: usize = 60;
+const HASH_SIZE: usize = 48;
 
 enum Shape {
     Plus,
@@ -69,8 +69,12 @@ impl Shape {
 struct Chamber<'a> {
     /// The jets of hot gas.
     jets: Cycle<Enumerate<Chars<'a>>>,
+    /// The index of the last-activated jet.
+    jet_idx: usize,
     /// An infinite iterator that emits rock shapes in the prescribed order.
     shapes: Cycle<Enumerate<Iter<'a, Shape>>>,
+    /// The index of the last-dropped shape.
+    shape_idx: usize,
     /// The settled rocks, represented by bits.
     rocks: VecDeque<u8>,
     /// The highest point in the chamber.
@@ -100,7 +104,9 @@ impl<'a> Chamber<'a> {
 
         Self {
             shapes,
+            shape_idx: 0,
             jets,
+            jet_idx: 0,
             rocks,
             peak: 0,
             rock_count: 0,
@@ -170,121 +176,153 @@ impl<'a> Chamber<'a> {
             self.rocks.drain(0..prune_count);
         }
     }
-}
 
-impl Iterator for Chamber<'_> {
-    type Item = usize;
-
-    fn next(&mut self) -> Option<Self::Item> {
-        let (_shape_idx, shape) = self.shapes.next().unwrap();
-        let mut mask = shape.mask();
-
-        // create a rock with the given shape
-        // position it 4+ units _above_ the highest point
-        //
-
-        // the coordinates of the rock, anchored to the bottom-left corner of each rock mask.
-        let mut y = self.peak + 3;
-
-        // add new empty space above the peak
-        self.fill_space(self.peak + 4 + 3);
-
-        // println!("A new rock falls.");
-        // println!("{}", self.to_string(Some((mask, y))));
-
-        self.rock_count += 1;
-
-        if self.rock_count % 10000000 == 0 {
-            println!("{}", (self.rock_count as f32) / 1000000000000.0);
+    fn nth(&mut self, total_rocks: usize) -> usize {
+        #[derive(Hash, PartialEq, Eq)]
+        struct MemoKey {
+            shape_idx: usize,
+            jet_idx: usize,
         }
+        struct MemoVal {
+            peak: usize,
+            rock_count: usize,
+        }
+        let mut memo: HashMap<MemoKey, MemoVal> = HashMap::new();
+        let mut extra = 0;
+        while self.rock_count <= total_rocks {
+            let (shape_idx, shape) = self.shapes.next().unwrap();
+            self.shape_idx = shape_idx;
+            let mut mask = shape.mask();
 
-        'outer: loop {
-            // push
-            let (_jet_idx, jet) = self.jets.next().unwrap();
+            // create a rock with the given shape
+            // position it 4+ units _above_ the highest point
+            //
+
+            // the coordinates of the rock, anchored to the bottom-left corner of each rock mask.
+            let mut y = self.peak + 3;
+
+            // add new empty space above the peak
+            self.fill_space(self.peak + 4 + 3);
+
+            // println!("A new rock falls.");
             // println!("{}", self.to_string(Some((mask, y))));
 
-            let mut shifted_mask = mask.map(|_| None);
+            self.rock_count += 1;
 
-            for (shape_y, row) in mask.iter().enumerate() {
-                let new_row = if jet == '<' {
-                    let would_hit_left_wall = row & 0b1000000 != 0;
-                    if !would_hit_left_wall {
-                        Some(row << 1)
-                    } else {
-                        None
-                    }
-                } else {
-                    let would_hit_right_wall = row & 1 != 0;
-                    if !would_hit_right_wall {
-                        Some(row >> 1)
-                    } else {
-                        None
-                    }
-                };
-
-                if let Some(new_row) = new_row {
-                    if self.row_collides(shape_y + y, new_row) {
-                        shifted_mask[shape_y] = None;
-                    } else {
-                        shifted_mask[shape_y] = Some(new_row);
-                    }
-                }
+            if self.rock_count % 10000000 == 0 {
+                println!("{}", (self.rock_count as f32) / 1000000000000.0);
             }
 
-            // print!("Jet of gas pushes rock ");
-            // if jet == '<' {
-            //     // print!("left");
-            // } else {
-            //     // print!("right");
-            // }
-            if shifted_mask.iter().all(|row| row.is_some()) {
-                // println!(".");
-                mask = shifted_mask.map(|row_opt| row_opt.unwrap());
+            'outer: loop {
+                // push
+                let (jet_idx, jet) = self.jets.next().unwrap();
+                self.jet_idx = jet_idx;
                 // println!("{}", self.to_string(Some((mask, y))));
-            } else {
-                // println!(", but nothing happens.");
-            }
-            // println!("{}", self.to_string(Some((mask, y))));
 
-            // print!("Rock falls 1 unit");
 
-            // fall
-            //   decrement y and | with rocks in range
-            //   if | > 0, rock is now resting
-            if let Some(new_y) = y.checked_sub(1) {
+                let mut shifted_mask = mask.map(|_| None);
+
                 for (shape_y, row) in mask.iter().enumerate() {
-                    if self.row_collides(shape_y + new_y, *row) {
-                        // come to rest on another rock
-                        // println!(", causing it to come to rest.");
-                        break 'outer;
+                    let new_row = if jet == '<' {
+                        let would_hit_left_wall = row & 0b1000000 != 0;
+                        if !would_hit_left_wall {
+                            Some(row << 1)
+                        } else {
+                            None
+                        }
+                    } else {
+                        let would_hit_right_wall = row & 1 != 0;
+                        if !would_hit_right_wall {
+                            Some(row >> 1)
+                        } else {
+                            None
+                        }
+                    };
+
+                    if let Some(new_row) = new_row {
+                        if self.row_collides(shape_y + y, new_row) {
+                            shifted_mask[shape_y] = None;
+                        } else {
+                            shifted_mask[shape_y] = Some(new_row);
+                        }
                     }
                 }
 
-                y = new_y;
-            } else {
-                // println!(", causing it to come to rest.");
-                // come to rest at the floor
-                break;
+                // print!("Jet of gas pushes rock ");
+                // if jet == '<' {
+                //     // print!("left");
+                // } else {
+                //     // print!("right");
+                // }
+                if shifted_mask.iter().all(|row| row.is_some()) {
+                    // println!(".");
+                    mask = shifted_mask.map(|row_opt| row_opt.unwrap());
+                    // println!("{}", self.to_string(Some((mask, y))));
+                } else {
+                    // println!(", but nothing happens.");
+                }
+                // println!("{}", self.to_string(Some((mask, y))));
+
+                // print!("Rock falls 1 unit");
+
+                // fall
+                //   decrement y and | with rocks in range
+                //   if | > 0, rock is now resting
+                if let Some(new_y) = y.checked_sub(1) {
+                    for (shape_y, row) in mask.iter().enumerate() {
+                        if self.row_collides(shape_y + new_y, *row) {
+                            // come to rest on another rock
+                            // println!(", causing it to come to rest.");
+
+                            break 'outer;
+                        }
+                    }
+
+                    y = new_y;
+                } else {
+                    // println!(", causing it to come to rest.");
+                    // come to rest at the floor
+                    break;
+                }
+
+                // println!(".");
             }
 
-            // println!(".");
+            // at rest
+            //   update self.peak
+            //   bitor mask into self.rocks
+            for shape_y in 0..shape.height() {
+                let new_row = mask[shape_y];
+                self.rocks[y + shape_y - self.prune_count] |= new_row;
+            }
+
+            // store new peak height, if the new shape exceeds the current peak (shapes can come to
+            // rest below the current peak)
+            self.peak = self.peak.max(y + shape.height());
+
+            // thanks Reddit
+            if self.rock_count > 2022 && extra == 0 {
+                let key = MemoKey { shape_idx: self.shape_idx, jet_idx: self.jet_idx };
+                if memo.contains_key(&key) {
+                    let val = memo.get(&key).unwrap();
+                    let rock_diff = self.rock_count - val.rock_count;
+                    let peak_diff = self.peak - val.peak;
+                    let remaining_rocks = total_rocks - self.rock_count;
+                    let repeat = remaining_rocks / rock_diff;
+                    // println!("FOUND shape {} jet {} 🔺rock {} 🔺peak {} repeat {}", self.shape_idx, self.jet_idx, rock_diff, peak_diff, repeat);
+                    self.rock_count += repeat * rock_diff;
+                    extra += repeat * peak_diff;
+                } else {
+                    memo.insert(key, MemoVal {
+                        peak: self.peak,
+                        rock_count: self.rock_count,
+                    });
+                }
+            }
+            // println!("{}", self.to_string(Some((mask, y))));
+
         }
-
-        // at rest
-        //   update self.peak
-        //   bitor mask into self.rocks
-        for shape_y in 0..shape.height() {
-            let new_row = mask[shape_y];
-            self.rocks[y + shape_y - self.prune_count] |= new_row;
-        }
-
-        // store new peak height, if the new shape exceeds the current peak (shapes can come to
-        // rest below the current peak)
-        self.peak = self.peak.max(y + shape.height());
-
-        // println!("{}", self.to_string(Some((mask, y))));
-
-        Some(self.peak)
+        self.peak + extra
     }
 }
 
@@ -292,14 +330,14 @@ impl Iterator for Chamber<'_> {
 fn part1_solve(input: &str) -> usize {
     let mut chamber = Chamber::new(input);
 
-    chamber.nth(2022 - 1).unwrap()
+    chamber.nth(2022 - 1)
 }
 
 #[aoc(day17, part2)]
 fn part2_solve(input: &str) -> usize {
     let mut chamber = Chamber::new(input);
 
-    chamber.nth(1000000000000 - 1).unwrap()
+    chamber.nth(1000000000000 - 1)
 }
 
 #[cfg(test)]
