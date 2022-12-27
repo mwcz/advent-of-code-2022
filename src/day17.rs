@@ -1,16 +1,13 @@
-use std::{iter::Cycle, slice::Iter, str::Chars};
+use std::{
+    collections::VecDeque,
+    iter::{Cycle, Enumerate},
+    slice::Iter,
+    str::Chars,
+};
 
 use aoc_runner_derive::aoc;
 
-struct Rock {
-    shape: Shape,
-    pos: Point,
-}
-
-struct Point {
-    x: u32,
-    y: u32,
-}
+const HASH_SIZE: usize = 60;
 
 enum Shape {
     Plus,
@@ -71,18 +68,22 @@ impl Shape {
 
 struct Chamber<'a> {
     /// The jets of hot gas.
-    jets: Cycle<Chars<'a>>,
+    jets: Cycle<Enumerate<Chars<'a>>>,
     /// An infinite iterator that emits rock shapes in the prescribed order.
-    shapes: Cycle<Iter<'a, Shape>>,
+    shapes: Cycle<Enumerate<Iter<'a, Shape>>>,
     /// The settled rocks, represented by bits.
-    rocks: Vec<u8>,
+    rocks: VecDeque<u8>,
     /// The highest point in the chamber.
     peak: usize,
+    /// How many rocks have fallen.
+    rock_count: usize,
+    /// How many rocks have been removed from the bottom.
+    prune_count: usize,
 }
 
 impl<'a> Chamber<'a> {
     fn new(jets: &'a str) -> Self {
-        let jets = jets.chars().cycle();
+        let jets = jets.chars().enumerate().cycle();
 
         let shapes = [
             Shape::HLine,
@@ -92,66 +93,81 @@ impl<'a> Chamber<'a> {
             Shape::Square,
         ]
         .iter()
+        .enumerate()
         .cycle();
 
-        let rocks = Vec::with_capacity(10000);
+        let rocks = VecDeque::with_capacity(HASH_SIZE);
 
         Self {
             shapes,
             jets,
             rocks,
             peak: 0,
+            rock_count: 0,
+            prune_count: 0,
         }
     }
 
-    fn to_string(&self, falling: Option<([u8; 4], usize)>) -> String {
-        let mut out = "".to_string();
-        out.push_str("\n      +-------+\n");
-        for (y, rock) in self.rocks.iter().enumerate().rev() {
-            out.push_str(&format!("{y:5} "));
-            out.push_str(
-                &format!("|{rock:07b}|\n")
-                    .chars()
-                    .enumerate()
-                    .map(|(i, c)| {
-                        if let Some((shape, shape_y)) = &falling {
-                            for (row_y, row) in shape.iter().enumerate() {
-                                let rowbits = format!("{row:07b}");
-                                if (1..=7).contains(&i) {
-                                    if shape_y + row_y == y
-                                        && rowbits.chars().nth(i - 1).unwrap() == '1'
-                                    {
-                                        return '@';
-                                    }
-                                }
-                            }
-                        }
-                        if c == '1' {
-                            '#'
-                        } else if c == '0' {
-                            '.'
-                        } else {
-                            c
-                        }
-                    })
-                    .collect::<String>(),
-            );
-        }
-        out.push_str("      +-------+");
-        out
-    }
+    // fn to_string(&self, falling: Option<([u8; 4], usize)>) -> String {
+    //     let mut out = "".to_string();
+    //     out.push_str("\n      +-------+\n");
+    //     for (y, rock) in self.rocks.iter().enumerate().rev() {
+    //         out.push_str(&format!("{:5} ", y + self.prune_count));
+    //         out.push_str(
+    //             &format!("|{rock:07b}|\n")
+    //                 .chars()
+    //                 .enumerate()
+    //                 .map(|(i, c)| {
+    //                     if let Some((shape, shape_y)) = &falling {
+    //                         for (row_y, row) in shape.iter().enumerate() {
+    //                             let rowbits = format!("{row:07b}");
+    //                             if (1..=7).contains(&i) {
+    //                                 if shape_y + row_y == y
+    //                                     && rowbits.chars().nth(i - 1).unwrap() == '1'
+    //                                 {
+    //                                     return '@';
+    //                                 }
+    //                             }
+    //                         }
+    //                     }
+    //                     if c == '1' {
+    //                         '#'
+    //                     } else if c == '0' {
+    //                         '.'
+    //                     } else {
+    //                         c
+    //                     }
+    //                 })
+    //                 .collect::<String>(),
+    //         );
+    //     }
+    //     out.push_str("      +-------+");
+    //     out
+    // }
 
     fn row_collides(&self, y: usize, row: u8) -> bool {
         let hit_left_wall = row >= 0b10000000;
-        let row_at_rest = self.rocks[y];
+        // println!();
+        // println!("{:#?}", self.rocks);
+        // println!("{:#?}", self.rock_count);
+        // println!("{:#?}", self.rocks.len());
+        // println!("y: {:#?}", y);
+        // println!("pc: {:#?}", self.prune_count);
+        let row_at_rest = self.rocks[y - self.prune_count];
         let hit_rock = (row_at_rest & row) != 0;
 
         hit_left_wall || hit_rock
     }
 
     fn fill_space(&mut self, y: usize) {
-        for _ in self.rocks.len()..y {
-            self.rocks.push(0);
+        for _ in self.rocks.len()..(y - self.prune_count) {
+            self.rocks.push_back(0);
+        }
+        // remove rocks in excess of the hash size
+        if self.rocks.len() > HASH_SIZE {
+            let prune_count = self.rocks.len() - HASH_SIZE;
+            self.prune_count += prune_count;
+            self.rocks.drain(0..prune_count);
         }
     }
 }
@@ -160,7 +176,7 @@ impl Iterator for Chamber<'_> {
     type Item = usize;
 
     fn next(&mut self) -> Option<Self::Item> {
-        let shape = self.shapes.next().unwrap();
+        let (_shape_idx, shape) = self.shapes.next().unwrap();
         let mut mask = shape.mask();
 
         // create a rock with the given shape
@@ -176,9 +192,15 @@ impl Iterator for Chamber<'_> {
         // println!("A new rock falls.");
         // println!("{}", self.to_string(Some((mask, y))));
 
+        self.rock_count += 1;
+
+        if self.rock_count % 10000000 == 0 {
+            println!("{}", (self.rock_count as f32) / 1000000000000.0);
+        }
+
         'outer: loop {
             // push
-            let jet = self.jets.next().unwrap();
+            let (_jet_idx, jet) = self.jets.next().unwrap();
             // println!("{}", self.to_string(Some((mask, y))));
 
             let mut shifted_mask = mask.map(|_| None);
@@ -210,11 +232,11 @@ impl Iterator for Chamber<'_> {
             }
 
             // print!("Jet of gas pushes rock ");
-            if jet == '<' {
-                // print!("left");
-            } else {
-                // print!("right");
-            }
+            // if jet == '<' {
+            //     // print!("left");
+            // } else {
+            //     // print!("right");
+            // }
             if shifted_mask.iter().all(|row| row.is_some()) {
                 // println!(".");
                 mask = shifted_mask.map(|row_opt| row_opt.unwrap());
@@ -253,7 +275,7 @@ impl Iterator for Chamber<'_> {
         //   bitor mask into self.rocks
         for shape_y in 0..shape.height() {
             let new_row = mask[shape_y];
-            self.rocks[y + shape_y] |= new_row;
+            self.rocks[y + shape_y - self.prune_count] |= new_row;
         }
 
         // store new peak height, if the new shape exceeds the current peak (shapes can come to
@@ -270,22 +292,14 @@ impl Iterator for Chamber<'_> {
 fn part1_solve(input: &str) -> usize {
     let mut chamber = Chamber::new(input);
 
-    let ans = chamber.nth(2021).unwrap();
-
-    // println!("{}", chamber.to_string(None));
-
-    ans
+    chamber.nth(2022 - 1).unwrap()
 }
 
 #[aoc(day17, part2)]
 fn part2_solve(input: &str) -> usize {
     let mut chamber = Chamber::new(input);
 
-    let ans = chamber.nth(1000000000000).unwrap();
-
-    // println!("{}", chamber.to_string(None));
-
-    ans
+    chamber.nth(1000000000000 - 1).unwrap()
 }
 
 #[cfg(test)]
