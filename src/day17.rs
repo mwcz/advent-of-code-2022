@@ -300,7 +300,14 @@ impl<'a> Chamber<'a> {
             // rest below the current peak)
             self.peak = self.peak.max(y + shape.height());
 
-            // thanks Reddit
+            // thanks Reddit.  I still don't understand why the rows of settled rocks are totally
+            // irrelevant here.  It _really_ seems like they need to be part of the hash as well,
+            // instead of only the shape and jet matching up.  The only thing I can think of is
+            // that it has something to do with the shape and jet only cycling when the settled
+            // rocks below are in the same pattern.  Ie, settled rocks influence how many jets are
+            // applied to each new shape, and maybe only exact same rock formations can cause the
+            // jets and shapes to line up again.  There are a prime number of jets in my input
+            // (10091), and 5 shapes.
             if self.rock_count > 2022 && extra == 0 {
                 let key = MemoKey { shape_idx: self.shape_idx, jet_idx: self.jet_idx };
                 if memo.contains_key(&key) {
