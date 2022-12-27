@@ -76,7 +76,7 @@ impl<'input> Cave<'input> {
         //     valve.mask = mask;
         // }
 
-        println!("{:#?}", cave.graph.nodes());
+        // println!("{:#?}", cave.graph.nodes());
 
         // pre-compute distances between each pair of valves
 
