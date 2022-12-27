@@ -26,34 +26,34 @@ impl Shape {
         match self {
             // these are upside down on purpose (so the bottom edge is at index 0)
             Shape::Plus => [
-                0b00010000,
-                0b00111000,
-                0b00010000,
-                0b00000000,
+                0b0001000,
+                0b0011100,
+                0b0001000,
+                0b0000000,
             ],
             Shape::Corner => [
-                0b00111000,
-                0b00001000,
-                0b00001000,
-                0b00000000,
+                0b0011100,
+                0b0000100,
+                0b0000100,
+                0b0000000,
             ],
             Shape::HLine => [
-                0b00111100,
-                0b00000000,
-                0b00000000,
-                0b00000000,
+                0b0011110,
+                0b0000000,
+                0b0000000,
+                0b0000000,
             ],
             Shape::VLine => [
-                0b00100000,
-                0b00100000,
-                0b00100000,
-                0b00100000,
+                0b0010000,
+                0b0010000,
+                0b0010000,
+                0b0010000,
             ],
             Shape::Square => [
-                0b00110000,
-                0b00110000,
-                0b00000000,
-                0b00000000,
+                0b0011000,
+                0b0011000,
+                0b0000000,
+                0b0000000,
             ],
         }
     }
@@ -94,7 +94,7 @@ impl<'a> Chamber<'a> {
         .iter()
         .cycle();
 
-        let rocks = vec![];
+        let rocks = Vec::with_capacity(10000);
 
         Self {
             shapes,
@@ -104,24 +104,22 @@ impl<'a> Chamber<'a> {
         }
     }
 
-    fn to_string(&self, falling: Option<([u8; 4], usize, char)>) -> String {
-        let mut out = "Rock Chamber".to_string();
-        if let Some((_, _, jet)) = falling {
-            out.push_str(format!(" ({})", jet).as_str());
-        }
-        out.push_str("\n+--------+\n");
-        for (y, rock) in self.rocks.iter().rev().enumerate() {
+    fn to_string(&self, falling: Option<([u8; 4], usize)>) -> String {
+        let mut out = "".to_string();
+        out.push_str("\n      +-------+\n");
+        for (y, rock) in self.rocks.iter().enumerate().rev() {
+            out.push_str(&format!("{y:5} "));
             out.push_str(
-                &format!("|{rock:08b}|\n")
+                &format!("|{rock:07b}|\n")
                     .chars()
                     .enumerate()
                     .map(|(i, c)| {
-                        if let Some((shape, shape_y, _)) = &falling {
+                        if let Some((shape, shape_y)) = &falling {
                             for (row_y, row) in shape.iter().enumerate() {
-                                let rowbits = format!("{row:08b}");
-                                if (0..8).contains(&i) {
+                                let rowbits = format!("{row:07b}");
+                                if (1..=7).contains(&i) {
                                     if shape_y + row_y == y
-                                        && rowbits.chars().nth(i).unwrap() == '1'
+                                        && rowbits.chars().nth(i - 1).unwrap() == '1'
                                     {
                                         return '@';
                                     }
@@ -131,7 +129,7 @@ impl<'a> Chamber<'a> {
                         if c == '1' {
                             '#'
                         } else if c == '0' {
-                            ' '
+                            '.'
                         } else {
                             c
                         }
@@ -139,16 +137,16 @@ impl<'a> Chamber<'a> {
                     .collect::<String>(),
             );
         }
-        out.push_str("+--------+");
+        out.push_str("      +-------+");
         out
     }
 
     fn row_collides(&self, y: usize, row: u8) -> bool {
-        let hit_right_wall = (row & 1) != 0;
+        let hit_left_wall = row >= 0b10000000;
         let row_at_rest = self.rocks[y];
         let hit_rock = (row_at_rest & row) != 0;
 
-        hit_right_wall || hit_rock
+        hit_left_wall || hit_rock
     }
 
     fn fill_space(&mut self, y: usize) {
@@ -162,7 +160,6 @@ impl Iterator for Chamber<'_> {
     type Item = usize;
 
     fn next(&mut self) -> Option<Self::Item> {
-        println!("A new rock falls.");
         let shape = self.shapes.next().unwrap();
         let mut mask = shape.mask();
 
@@ -171,23 +168,36 @@ impl Iterator for Chamber<'_> {
         //
 
         // the coordinates of the rock, anchored to the bottom-left corner of each rock mask.
-        let mut y = self.peak + 4;
+        let mut y = self.peak + 3;
 
         // add new empty space above the peak
-        self.fill_space(self.peak + 4 + 4);
+        self.fill_space(self.peak + 4 + 3);
+
+        // println!("A new rock falls.");
+        // println!("{}", self.to_string(Some((mask, y))));
 
         'outer: loop {
             // push
             let jet = self.jets.next().unwrap();
-            // println!("{}", self.to_string(Some((mask, y, jet))));
+            // println!("{}", self.to_string(Some((mask, y))));
 
             let mut shifted_mask = mask.map(|_| None);
 
             for (shape_y, row) in mask.iter().enumerate() {
                 let new_row = if jet == '<' {
-                    row.checked_shl(1)
+                    let would_hit_left_wall = row & 0b1000000 != 0;
+                    if !would_hit_left_wall {
+                        Some(row << 1)
+                    } else {
+                        None
+                    }
                 } else {
-                    row.checked_shr(1)
+                    let would_hit_right_wall = row & 1 != 0;
+                    if !would_hit_right_wall {
+                        Some(row >> 1)
+                    } else {
+                        None
+                    }
                 };
 
                 if let Some(new_row) = new_row {
@@ -199,50 +209,43 @@ impl Iterator for Chamber<'_> {
                 }
             }
 
-            print!("Jet of gas pushes rock ");
+            // print!("Jet of gas pushes rock ");
             if jet == '<' {
-                print!("left");
+                // print!("left");
             } else {
-                print!("right");
+                // print!("right");
             }
             if shifted_mask.iter().all(|row| row.is_some()) {
-                println!(".");
+                // println!(".");
                 mask = shifted_mask.map(|row_opt| row_opt.unwrap());
                 // println!("{}", self.to_string(Some((mask, y))));
             } else {
-                println!(", but nothing happens.");
+                // println!(", but nothing happens.");
             }
+            // println!("{}", self.to_string(Some((mask, y))));
 
-            print!("Rock falls 1 unit");
+            // print!("Rock falls 1 unit");
 
             // fall
             //   decrement y and | with rocks in range
             //   if | > 0, rock is now resting
             if let Some(new_y) = y.checked_sub(1) {
-
                 for (shape_y, row) in mask.iter().enumerate() {
                     if self.row_collides(shape_y + new_y, *row) {
                         // come to rest on another rock
-                        println!(", causing it to come to rest.");
+                        // println!(", causing it to come to rest.");
                         break 'outer;
                     }
                 }
 
                 y = new_y;
-
-                if new_y == 0 {
-                    y = new_y;
-                    println!(", causing it to come to rest.");
-                    // come to rest at the floor
-                    break;
-                }
             } else {
-                y = 0;
-                println!(", causing it to come to rest.");
-                break 'outer;
+                // println!(", causing it to come to rest.");
+                // come to rest at the floor
+                break;
             }
 
-            println!(".");
+            // println!(".");
         }
 
         // at rest
@@ -253,9 +256,11 @@ impl Iterator for Chamber<'_> {
             self.rocks[y + shape_y] |= new_row;
         }
 
-        self.peak = y + shape.height();
+        // store new peak height, if the new shape exceeds the current peak (shapes can come to
+        // rest below the current peak)
+        self.peak = self.peak.max(y + shape.height());
 
-        // println!("{}", self.to_string(None));
+        // println!("{}", self.to_string(Some((mask, y))));
 
         Some(self.peak)
     }
@@ -265,9 +270,20 @@ impl Iterator for Chamber<'_> {
 fn part1_solve(input: &str) -> usize {
     let mut chamber = Chamber::new(input);
 
-    let ans = chamber.nth(1).unwrap();
+    let ans = chamber.nth(2021).unwrap();
 
-    println!("{}", chamber.to_string(None));
+    // println!("{}", chamber.to_string(None));
+
+    ans
+}
+
+#[aoc(day17, part2)]
+fn part2_solve(input: &str) -> usize {
+    let mut chamber = Chamber::new(input);
+
+    let ans = chamber.nth(1000000000000).unwrap();
+
+    // println!("{}", chamber.to_string(None));
 
     ans
 }
@@ -283,8 +299,8 @@ mod tests {
         assert_eq!(part1_solve(EX), 3068);
     }
 
-    // #[test]
-    // fn part2_test() {
-    //     assert_eq!(part2_solve(EX, 20), 56000011);
-    // }
+    #[test]
+    fn part2_test() {
+        assert_eq!(part2_solve(EX), 1514285714288);
+    }
 }
