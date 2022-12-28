@@ -44,7 +44,7 @@ impl<'input> Cave<'input> {
         // assign masks to the good nodes
         for valve in valves.iter_mut() {
             if valve.data.rate > 0 || valve.data.name == START {
-                (*valve).data.mask = 1 << good_node_count;
+                valve.data.mask = 1 << good_node_count;
                 good_node_count += 1;
             }
         }
@@ -63,7 +63,7 @@ impl<'input> Cave<'input> {
                 .iter()
                 .filter_map(|e| valves.iter().find(|v| e == v.data.name));
             for exit in exits {
-                cave.add_tunnel(&valve.data, &exit, &valves, &mut vec![valve.data.name]);
+                cave.add_tunnel(&valve.data, exit, &valves, &mut vec![valve.data.name]);
             }
             good_node_count += 1;
         }
@@ -90,7 +90,7 @@ impl<'input> Cave<'input> {
                                 return ((path.0 .0.mask, path.0 .1.mask), *opposite);
                             }
                         }
-                        return ((path.0 .0.mask, path.0 .1.mask), *path.1);
+                        ((path.0 .0.mask, path.0 .1.mask), *path.1)
                     })
                     .collect(),
             );
@@ -144,8 +144,6 @@ impl<'input> Cave<'input> {
         rate: u16,
         score: u16,
         remaining_time: u16,
-        total_time: u16,
-        all_nodes: u16,
     ) {
         // println!("{} -> {:?}", score, path);
 
@@ -191,8 +189,6 @@ impl<'input> Cave<'input> {
                 rate,
                 score,
                 arrival_time,
-                total_time,
-                all_nodes,
             );
         }
     }
@@ -223,8 +219,8 @@ fn generator(input: &str) -> Vec<Valve> {
             .unwrap();
         words.nth(3).unwrap(); // "tunnels lead to valve"
         let mut exits = vec![];
-        while let Some(word) = words.next() {
-            exits.push(word.replace(",", ""));
+        for word in words {
+            exits.push(word.replace(',', ""));
         }
 
         let valve = Valve {
@@ -246,7 +242,6 @@ fn part1_solve(input: &str) -> u16 {
     let valves = generator(input);
     let cave = Cave::new(valves);
 
-    let all_valves_mask = 1 << cave.graph.nodes().len() - 1;
     // println!("{:?}", Dot::with_config(&cave.graph, &[]));
 
     if let Some(start) = cave.start {
@@ -258,8 +253,6 @@ fn part1_solve(input: &str) -> u16 {
             0,
             0,
             30,
-            30,
-            all_valves_mask,
         );
         answer.into_iter().map(|p| p.1).max().unwrap()
     } else {
@@ -272,8 +265,6 @@ fn part2_solve(input: &str) -> u16 {
     let valves = generator(input);
     let cave = Cave::new(valves);
 
-    let all_valves_mask = (1 << cave.graph.nodes().len()) - 1;
-
     if let Some(start) = cave.start {
         let mut answer = Vec::new();
         cave.visit(
@@ -283,8 +274,6 @@ fn part2_solve(input: &str) -> u16 {
             0,
             0,
             26,
-            26,
-            all_valves_mask,
         );
 
         let mut score = 0;

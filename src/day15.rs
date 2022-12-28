@@ -53,8 +53,8 @@ fn part1_solve(input: &str, row: i64) -> usize {
         };
         let dist = sensor.dist(&beacon);
 
-        x_min = x_min.min(sensor_x - dist as i64);
-        x_max = x_max.max(sensor_x + dist as i64);
+        x_min = x_min.min(sensor_x - dist);
+        x_max = x_max.max(sensor_x + dist);
 
         records.push(Record {
             sensor,
@@ -66,7 +66,7 @@ fn part1_solve(input: &str, row: i64) -> usize {
     let mut no_count = 0;
     'outer: for x in x_min..=x_max {
         let p = Point {
-            x: x as i64,
+            x,
             y: row,
         };
 
@@ -75,7 +75,7 @@ fn part1_solve(input: &str, row: i64) -> usize {
 
         for record in &records {
             if p.dist(&record.sensor) <= record.dist {
-                if records.iter().find(|r| r.beacon == p).is_none() {
+                if !records.iter().any(|r| r.beacon == p) {
                     no_count += 1;
                 }
                 continue 'outer;
@@ -122,11 +122,11 @@ fn part2_solve(input: &str, size: i64) -> i64 {
         };
         let dist = sensor.dist(&beacon);
 
-        x_min = x_min.min(sensor_x - dist as i64);
-        x_max = x_max.max(sensor_x + dist as i64);
+        x_min = x_min.min(sensor_x - dist);
+        x_max = x_max.max(sensor_x + dist);
 
-        y_min = y_min.min(sensor_y - dist as i64);
-        y_max = y_max.max(sensor_y + dist as i64);
+        y_min = y_min.min(sensor_y - dist);
+        y_max = y_max.max(sensor_y + dist);
 
         records.push(Record {
             sensor,

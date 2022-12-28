@@ -291,8 +291,7 @@ impl<'a> Chamber<'a> {
             // at rest
             //   update self.peak
             //   bitor mask into self.rocks
-            for shape_y in 0..shape.height() {
-                let new_row = mask[shape_y];
+            for (shape_y, new_row) in mask.iter().enumerate().take(shape.height()) {
                 self.rocks[y + shape_y - self.prune_count] |= new_row;
             }
 
