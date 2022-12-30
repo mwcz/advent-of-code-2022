@@ -17,3 +17,9 @@ petgraph = "0.6.2"
 rayon = "1.6.1"
 serde = { version = "1.0", features = ["serde_derive"] }
 serde_json = "1.0.89"
+
+# [profile.release]
+# codegen-units = 1 
+# lto = true    
+# strip = true  
+# panic = "abort" 
