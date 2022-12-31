@@ -118,7 +118,6 @@ fn part1_solve(input: &str) -> i32 {
 
     fn affordable(bp: &Blueprint, bot: &Bot, wallet: &Amount) -> (Amount, Amount) {
         let cost = match bot {
-            // Bot::Wait => (Amount::zero(), Amount::zero()),
             Bot::Ore => (bp.ore_bot, Amount::new(1, 0, 0, 0)),
             Bot::Clay => (bp.clay_bot, Amount::new(0, 1, 0, 0)),
             Bot::Obs => (bp.obs_bot, Amount::new(0, 0, 1, 0)),
@@ -252,8 +251,8 @@ fn part1_solve(input: &str) -> i32 {
                 ttw * rate.geo + spent_wallet.geo,
             );
 
+            // if we didn't spend too much, keep searching
             if new_wallet.ore >= 0 && new_wallet.clay >= 0 && new_wallet.obs >= 0 {
-                // keep searching if there's enough time left to implement this branch
                 search(strats, max, bp, minute + ttw, new_wallet, new_rate);
             }
         }
@@ -268,7 +267,7 @@ fn part1_solve(input: &str) -> i32 {
 
         println!("Analyzing blueprint {}", bp.id);
 
-        search(&mut strats, &mut max, &bp, 0, wallet, rate);
+        search(&mut strats, &mut max, bp, 0, wallet, rate);
     }
 
     strats.iter().map(|(bp, geos)| bp.id * geos).sum()
