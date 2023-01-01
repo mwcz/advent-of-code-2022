@@ -1,7 +1,7 @@
 use aoc_runner_derive::aoc;
 use std::{
     collections::HashMap,
-    ops::{Add, Sub},
+    ops::{Add, Div, Mul, Sub},
 };
 
 #[derive(Copy, Clone, Debug, Eq, PartialEq, Hash)]
@@ -20,6 +20,10 @@ impl Amount {
             obs,
             geo,
         }
+    }
+    fn in_the_black(&self) -> bool {
+        // don't bother checking for geos, they'll always be >= 0 since we can't spend them
+        self.ore >= 0 && self.clay >= 0 && self.obs >= 0
     }
 }
 
@@ -49,6 +53,19 @@ impl Sub for Amount {
     }
 }
 
+impl Mul<i32> for Amount {
+    type Output = Self;
+
+    fn mul(self, rhs: i32) -> Self::Output {
+        Self {
+            ore: self.ore * rhs,
+            clay: self.clay * rhs,
+            obs: self.obs * rhs,
+            geo: self.geo * rhs,
+        }
+    }
+}
+
 #[derive(Debug, Hash, PartialEq, Eq)]
 struct Blueprint {
     id: i32,
@@ -58,7 +75,7 @@ struct Blueprint {
     geo_bot: Amount,
 }
 
-#[derive(Debug, Eq, PartialEq)]
+#[derive(Debug, Eq, PartialEq, Clone, Copy)]
 enum Bot {
     Ore,
     Clay,
@@ -66,11 +83,77 @@ enum Bot {
     Geo,
 }
 
+impl Bot {
+    fn cost<'a>(&'a self, bp: &'a Blueprint) -> Amount {
+        match self {
+            Bot::Ore => bp.ore_bot,
+            Bot::Clay => bp.clay_bot,
+            Bot::Obs => bp.obs_bot,
+            Bot::Geo => bp.geo_bot,
+        }
+    }
+    fn rate<'a>(&'a self) -> Amount {
+        match self {
+            Bot::Ore => Amount::new(1, 0, 0, 0),
+            Bot::Clay => Amount::new(0, 1, 0, 0),
+            Bot::Obs => Amount::new(0, 0, 1, 0),
+            Bot::Geo => Amount::new(0, 0, 0, 1),
+        }
+    }
+    fn time_to_build(&self, wallet: &Amount, rate: &Amount, bp: &Blueprint) -> i32 {
+        match self {
+            Bot::Ore => {
+                if wallet.ore > bp.ore_bot.ore {
+                    1
+                } else {
+                    (bp.ore_bot.ore - wallet.ore).div_ceil(rate.ore)
+                }
+            }
+            Bot::Clay => {
+                if wallet.ore > bp.clay_bot.ore {
+                    1
+                } else {
+                    (bp.clay_bot.ore - wallet.ore).div_ceil(rate.ore)
+                }
+            }
+            Bot::Obs => {
+                let tt_ore = if wallet.ore > bp.obs_bot.ore {
+                    1
+                } else {
+                    (bp.obs_bot.ore - wallet.ore).div_ceil(rate.ore)
+                };
+                let tt_clay = if wallet.clay > bp.obs_bot.clay {
+                    1
+                } else {
+                    (bp.obs_bot.clay - wallet.clay).div_ceil(rate.clay)
+                };
+
+                tt_ore.max(tt_clay)
+            }
+            Bot::Geo => {
+                let tt_ore = if wallet.ore > bp.geo_bot.ore {
+                    1
+                } else {
+                    (bp.geo_bot.ore - wallet.ore).div_ceil(rate.ore)
+                };
+                let tt_obs = if wallet.obs > bp.geo_bot.obs {
+                    1
+                } else {
+                    (bp.geo_bot.obs - wallet.obs).div_ceil(rate.obs)
+                };
+
+                tt_ore.max(tt_obs)
+            }
+        }
+    }
+}
+
 impl Blueprint {
     fn new(id: usize, line: &str) -> Self {
         let mut words = line.split_whitespace();
+
+        // Example line:
         // Blueprint 1: Each ore robot costs 4 ore. Each clay robot costs 2 ore. Each obsidian robot costs 3 ore and 14 clay. Each geode robot costs 2 ore and 7 obsidian.
-        // 0            1    2   3     4     5 6    7    8    9     10   11 12   13   14       15    16   17 18  19  20 21    22   23    24    25   26 27  28 29 30
 
         words.nth(5);
 
@@ -116,27 +199,9 @@ fn part1_solve(input: &str) -> i32 {
 
     // println!("{:#?}", blueprint);
 
-    fn affordable(bp: &Blueprint, bot: &Bot, wallet: &Amount) -> (Amount, Amount) {
-        let cost = match bot {
-            Bot::Ore => (bp.ore_bot, Amount::new(1, 0, 0, 0)),
-            Bot::Clay => (bp.clay_bot, Amount::new(0, 1, 0, 0)),
-            Bot::Obs => (bp.obs_bot, Amount::new(0, 0, 1, 0)),
-            Bot::Geo => (bp.geo_bot, Amount::new(0, 0, 0, 1)),
-        };
-
-        (
-            Amount::new(
-                wallet.ore - cost.0.ore,
-                wallet.clay - cost.0.clay,
-                wallet.obs - cost.0.obs,
-                wallet.geo,
-            ),
-            cost.1,
-        )
-    }
-
     fn search<'a>(
         strats: &mut HashMap<&'a Blueprint, i32>,
+        steps: Vec<(Bot, i32)>,
         max: &mut i32,
         bp: &'a Blueprint,
         minute: i32,
@@ -153,6 +218,7 @@ fn part1_solve(input: &str) -> i32 {
                     minute,
                     bp.id * wallet.geo
                 );
+                println!("    Steps: {:?}", steps);
                 *max = wallet.geo;
                 // strats.push((bp, wallet.geo));
                 strats.insert(bp, wallet.geo);
@@ -160,19 +226,7 @@ fn part1_solve(input: &str) -> i32 {
             return;
         }
 
-        // // the most geos we could get if we build a geobot every remaining minute
-        // let max_buildable = minute * (minute + 1) / 2;
-
-        // // bail if we couldn't possibly make enough geo bots to match the current max
-        // if wallet.geo + rate.geo * (minute - 1) + max_buildable <= *max {
-        //     return;
-        // }
-
-        // spend
-
-        // try each bot we can afford
-
-        for (bot, spent_wallet, rate_adj) in [Bot::Geo, Bot::Obs, Bot::Clay, Bot::Ore]
+        for (bot, spent_wallet) in [Bot::Geo, Bot::Obs, Bot::Clay, Bot::Ore]
             .iter()
             .filter_map(|bot| {
                 // only include bots that can be afforded if we wait long enough at the current
@@ -183,77 +237,29 @@ fn part1_solve(input: &str) -> i32 {
                 } else if bot == &Bot::Geo && rate.obs == 0 {
                     None
                 } else {
-                    let aff = affordable(bp, bot, &wallet);
-                    Some((bot, aff.0, aff.1))
+                    // buy the bot (can result in negative wallet values; check for that later
+                    Some((bot, wallet - bot.cost(bp)))
                 }
             })
         {
             // time until the chosen bot is affordable
-            let tt_aff = match bot {
-                Bot::Ore => {
-                    if wallet.ore > bp.ore_bot.ore {
-                        1
-                    } else {
-                        (bp.ore_bot.ore - wallet.ore).div_ceil(rate.ore)
-                    }
-                }
-                Bot::Clay => {
-                    if wallet.ore > bp.clay_bot.ore {
-                        1
-                    } else {
-                        (bp.clay_bot.ore - wallet.ore).div_ceil(rate.ore)
-                    }
-                }
-                Bot::Obs => {
-                    let tt_ore = if wallet.ore > bp.obs_bot.ore {
-                        1
-                    } else {
-                        (bp.obs_bot.ore - wallet.ore).div_ceil(rate.ore)
-                    };
-                    let tt_clay = if wallet.clay > bp.obs_bot.clay {
-                        1
-                    } else {
-                        (bp.obs_bot.clay - wallet.clay).div_ceil(rate.clay)
-                    };
+            let time_to_build = bot.time_to_build(&wallet, &rate, bp);
 
-                    tt_ore.max(tt_clay)
-                }
-                Bot::Geo => {
-                    let tt_ore = if wallet.ore > bp.geo_bot.ore {
-                        1
-                    } else {
-                        (bp.geo_bot.ore - wallet.ore).div_ceil(rate.ore)
-                    };
-                    let tt_obs = if wallet.obs > bp.geo_bot.obs {
-                        1
-                    } else {
-                        (bp.geo_bot.obs - wallet.obs).div_ceil(rate.obs)
-                    };
+            if minute + time_to_build > 24 {
+                // not enough time to buy this bot, so just spin down the clock at the current rate
+                // (the call to search will catch the base case)
+                let new_wallet = wallet + rate * (24 - minute);
+                search(strats, steps.clone(), max, bp, 24, new_wallet, rate);
+            } else {
+                let new_wallet = spent_wallet + rate * time_to_build;
+                let new_rate = rate + bot.rate();
+                let new_minute = minute + time_to_build;
 
-                    tt_ore.max(tt_obs)
-                }
-            };
-
-            // a time_remaining var that caps out at the maximum minutes
-            let ttw = tt_aff.min(24 - minute);
-
-            let new_rate = Amount::new(
-                rate.ore + rate_adj.ore,
-                rate.clay + rate_adj.clay,
-                rate.obs + rate_adj.obs,
-                rate.geo + rate_adj.geo,
-            );
-
-            let new_wallet = Amount::new(
-                ttw * rate.ore + spent_wallet.ore,
-                ttw * rate.clay + spent_wallet.clay,
-                ttw * rate.obs + spent_wallet.obs,
-                ttw * rate.geo + spent_wallet.geo,
-            );
-
-            // if we didn't spend too much, keep searching
-            if new_wallet.ore >= 0 && new_wallet.clay >= 0 && new_wallet.obs >= 0 {
-                search(strats, max, bp, minute + ttw, new_wallet, new_rate);
+                let mut new_steps = steps.clone();
+                new_steps.push( (*bot, new_minute + 1) );
+                // if new_wallet.in_the_black() {
+                    search(strats, new_steps, max, bp, new_minute, new_wallet, new_rate);
+                // }
             }
         }
     }
@@ -265,9 +271,9 @@ fn part1_solve(input: &str) -> i32 {
         let rate = Amount::new(1, 0, 0, 0);
         let mut max = 0;
 
-        println!("Analyzing blueprint {}", bp.id);
+        println!("Analyzing {:#?}\n", bp);
 
-        search(&mut strats, &mut max, bp, 0, wallet, rate);
+        search(&mut strats, vec![], &mut max, bp, 0, wallet, rate);
     }
 
     strats.iter().map(|(bp, geos)| bp.id * geos).sum()
