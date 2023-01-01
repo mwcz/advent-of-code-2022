@@ -353,10 +353,118 @@ fn part1_solve(input: &str) -> i32 {
         .sum()
 }
 
-// #[aoc(day19, part2)]
-// fn part2_solve(input: &str) -> usize {
-//     todo!();
-// }
+
+#[aoc(day19, part2)]
+fn part2_solve(input: &str) -> i32 {
+    let blueprint: Vec<Blueprint> = input
+        .lines()
+        .take(3)
+        .enumerate()
+        .map(|(i, line)| Blueprint::new(i + 1, line))
+        .collect();
+
+    // figure out some max required resources per minute
+
+    fn search<'a>(
+        strats: &mut HashMap<&'a Blueprint, i32>,
+        steps: Vec<(Bot, i32)>,
+        max: &mut i32,
+        bp: &'a Blueprint,
+        minutes: i32,
+        wallet: Amount,
+        rate: Amount,
+        total_minutes: i32,
+    ) {
+        // // the most geos we could get if we build a geobot every remaining minute
+        let max_buildable = minutes * (minutes + 1) / 2;
+
+        // // bail if we couldn't possibly make enough geo bots to match the current max
+        let cant_exceed_max = wallet.geo + rate.geo * minutes + max_buildable <= *max;
+
+        // base case
+        if minutes == 0
+        || cant_exceed_max
+        {
+            if wallet.geo > *max {
+                println!(
+                    "  blueprint {} got {} geodes: quality score {}",
+                    bp.id,
+                    wallet.geo,
+                    bp.id * wallet.geo
+                );
+                // println!("    Steps: {:?}", steps);
+                *max = wallet.geo;
+                // strats.push((bp, wallet.geo));
+                strats.insert(bp, wallet.geo);
+            }
+            return;
+        }
+
+        for (bot, spent_wallet) in
+            [Bot::Geo, Bot::Obs, Bot::Clay, Bot::Ore]
+                .iter()
+                .filter_map(|bot| {
+                    // only include bots that can be afforded if we wait long enough at the current
+                    // rate (ex, if we aren't mining any obsidian, we can't afford a geobot no matter
+                    // how long we wait)
+                    if bot == &Bot::Obs && rate.clay == 0 {
+                        None
+                    } else if bot == &Bot::Geo && rate.obs == 0 {
+                        None
+                    // if geo bot can be built in one turn, ignore other bots
+                    // } else if bot != &Bot::Geo && Bot::Geo.time_to_build(&Amount::new(0,0,0,0), &rate, bp) == 1 {
+                    //     None
+                    } else {
+                        // buy the bot (can result in negative wallet values; check for that later
+                        Some((bot, wallet - bot.cost(bp)))
+                    }
+                })
+        {
+            // time until the chosen bot is affordable
+            let time_to_build = bot.time_to_build(&wallet, &rate, bp);
+
+            if time_to_build >= minutes {
+                // not enough time to build this bot, so just spin down the clock at the current rate
+                // (the call to search will catch the base case)
+                let new_wallet = wallet + rate * minutes;
+                search(strats, steps.clone(), max, bp, 0, new_wallet, rate, total_minutes);
+            } else {
+                let new_wallet = spent_wallet + rate * time_to_build;
+                let new_rate = rate + bot.rate();
+                let new_minute = minutes - time_to_build;
+
+                let mut new_steps = steps.clone();
+                new_steps.push((*bot, 24 - new_minute + 1));
+
+                search(strats, new_steps, max, bp, new_minute, new_wallet, new_rate, total_minutes);
+            }
+        }
+    }
+
+    let mut strats: HashMap<&Blueprint, i32> = HashMap::new();
+
+    for bp in &blueprint {
+        let wallet = Amount::new(0, 0, 0, 0);
+        let rate = Amount::new(1, 0, 0, 0);
+        let mut max = 0;
+
+        // println!("Analyzing {:#?}\n", bp);
+
+        search(&mut strats, vec![], &mut max, bp, 32, wallet, rate, 32);
+    }
+
+    strats
+        .iter()
+        .map(|(bp, geos)| {
+            println!(
+                "Blueprint {} got {} geos",
+                bp.id, geos
+            );
+            geos
+        })
+        .product()
+}
+
 
 #[cfg(test)]
 mod tests {
@@ -370,8 +478,8 @@ Blueprint 2: Each ore robot costs 2 ore. Each clay robot costs 3 ore. Each obsid
         assert_eq!(part1_solve(EX), 33);
     }
 
-    // #[test]
-    // fn part2_test() {
-    //     assert_eq!(part2_solve(EX), 58);
-    // }
+    #[test]
+    fn part2_test() {
+        assert_eq!(part2_solve(EX), 56);
+    }
 }
