@@ -5,6 +5,7 @@ type Name<'a> = &'a str;
 type Operator = char;
 #[derive(Debug, Clone, Copy)]
 enum Value<'a> {
+    Unresolvable(Name<'a>),
     Resolved((Name<'a>, i128)),
     Pending((Name<'a>, Formula<'a>)),
 }
@@ -66,6 +67,10 @@ fn part1_solve(input: &str) -> i128 {
                             '*' => aval * bval,
                             '+' => aval + bval,
                             '-' => aval - bval,
+                            '=' => {
+                                println!("root: {a:?} = {b:?}",);
+                                0
+                            }
                             _ => unreachable!(),
                         };
                         vals.insert(name, Value::Resolved((name, newval)));
@@ -81,12 +86,21 @@ fn part1_solve(input: &str) -> i128 {
                         que.push_back(*a);
                         que.push_back(*b);
                     }
+                    // unresolvable isn't used in part1
+                    (Value::Unresolvable(_), Value::Unresolvable(_)) => panic!(),
+                    (Value::Unresolvable(_), Value::Resolved(_)) => panic!(),
+                    (Value::Unresolvable(_), Value::Pending(_)) => panic!(),
+                    (Value::Resolved(_), Value::Unresolvable(_)) => panic!(),
+                    (Value::Pending(_), Value::Unresolvable(_)) => panic!(),
                 }
+            }
+            Value::Unresolvable(_) => {
+                unreachable!("unresolvable value should not enter the queue");
             }
         }
     }
 
-    println!("{:#?}", vals);
+    // println!("{:#?}", vals);
 
     let Value::Resolved(ans) = vals.get("root").unwrap() else {
         panic!("root still unresolved!");
@@ -115,69 +129,107 @@ fn part2_solve(input: &str) -> i128 {
             );
         } else {
             // formula
-            vals.insert(
-                &strs[0],
-                Value::Pending((
+            if &strs[0] == "humn" {
+                vals.insert("humn", Value::Unresolvable("humn"));
+            } else {
+                vals.insert(
                     &strs[0],
-                    (&strs[1], strs[2].chars().next().unwrap(), &strs[3]),
-                )),
-            );
+                    Value::Pending((
+                        &strs[0],
+                        (
+                            &strs[1],
+                            if &strs[0] == "root" {
+                                '='
+                            } else {
+                                strs[2].chars().next().unwrap()
+                            },
+                            &strs[3],
+                        ),
+                    )),
+                );
+            }
         }
     }
 
     let root: Value = *vals.get("root").unwrap();
 
-    let mut que = VecDeque::from([root]);
+    // first operand of root's formula
+    let Value::Pending((_, (a, op, b))) = root else {
+        panic!("root must start pending");
+    };
+    let root_a = a;
+    let root_b = b;
 
-    println!("{:#?}", que);
+    let que_a = VecDeque::from([*vals.get(root_a).unwrap()]);
+    let que_b = VecDeque::from([*vals.get(root_b).unwrap()]);
 
-    while !que.is_empty() {
-        let next = que.back().unwrap();
+    fn solve<'a>(mut que: VecDeque<Value<'a>>, mut vals: HashMap<Name<'a>, Value<'a>>, root: &str) -> Option<i128> {
+        while !que.is_empty() {
+            let next = que.back().unwrap();
 
-        match next {
-            Value::Resolved(_) => {
-                unreachable!("resolved value should not enter the queue");
+            if let Value::Resolved((_, num)) = vals.get(root).unwrap() {
+                return Some(*num);
             }
-            Value::Pending((name, (a, op, b))) => {
-                let a = vals.get(*a).unwrap();
-                let b = vals.get(*b).unwrap();
 
-                match (a, b) {
-                    (Value::Resolved((_, aval)), Value::Resolved((_, bval))) => {
-                        // both parts of the formula are resolved, so make the current Value
-                        // resolved as well
-                        let newval = match op {
-                            '/' => aval / bval,
-                            '*' => aval * bval,
-                            '+' => aval + bval,
-                            '-' => aval - bval,
-                            _ => unreachable!(),
-                        };
-                        vals.insert(name, Value::Resolved((name, newval)));
-                        que.pop_back();
+            match next {
+                Value::Resolved(_) => {
+                    unreachable!("resolved value should not enter the queue");
+                }
+                Value::Pending((name, (a, op, b))) => {
+                    let a = vals.get(*a).unwrap();
+                    let b = vals.get(*b).unwrap();
+
+                    match (a, b) {
+                        (Value::Resolved((_, aval)), Value::Resolved((_, bval))) => {
+                            // both parts of the formula are resolved, so make the current Value
+                            // resolved as well
+                            let newval = match op {
+                                '/' => aval / bval,
+                                '*' => aval * bval,
+                                '+' => aval + bval,
+                                '-' => aval - bval,
+                                '=' => continue,
+                                _ => unreachable!(),
+                            };
+
+                            if *name == root {
+                                return Some(newval);
+                            }
+
+                            vals.insert(name, Value::Resolved((name, newval)));
+                            que.pop_back();
+                        }
+                        (Value::Resolved(_), Value::Pending(_)) => {
+                            que.push_back(*b);
+                        }
+                        (Value::Pending(_), Value::Resolved(_)) => {
+                            que.push_back(*a);
+                        }
+                        (Value::Pending(_), Value::Pending(_)) => {
+                            que.push_back(*a);
+                            que.push_back(*b);
+                        }
+                        (Value::Unresolvable(_), Value::Unresolvable(_)) => {
+                            panic!("can't have two unresolvable operands");
+                        }
+                        (Value::Unresolvable(_), Value::Resolved(_))
+                        | (Value::Resolved(_), Value::Unresolvable(_))
+                        | (Value::Pending(_), Value::Unresolvable(_))
+                        | (Value::Unresolvable(_), Value::Pending(_)) => {
+                            // unresolvable == skip this branch
+                            return None;
+                        }
                     }
-                    (Value::Resolved(_), Value::Pending(_)) => {
-                        que.push_back(*b);
-                    }
-                    (Value::Pending(_), Value::Resolved(_)) => {
-                        que.push_back(*a);
-                    }
-                    (Value::Pending(_), Value::Pending(_)) => {
-                        que.push_back(*a);
-                        que.push_back(*b);
-                    }
+                }
+                Value::Unresolvable(_) => {
+                    unreachable!("unresolvable value should not enter the queue");
                 }
             }
         }
+        Some(0)
     }
 
-    println!("{:#?}", vals);
-
-    let Value::Resolved(ans) = vals.get("root").unwrap() else {
-        panic!("root still unresolved!");
-    };
-
-    ans.1
+    solve(que_a, vals.clone(), root_a).unwrap_or_else(|| solve(que_b, vals.clone(), root_b).unwrap())
 }
 
 #[aoc(day21, part1)]
