@@ -2,7 +2,7 @@ use aoc_runner_derive::aoc;
 use std::{
     cmp::Ordering::{Equal, Greater, Less},
     collections::HashMap,
-    ops::{Add, Div, Mul, Sub},
+    ops::{Add, Mul, Sub},
 };
 
 #[derive(Copy, Clone, Debug, Eq, PartialEq, Hash)]
