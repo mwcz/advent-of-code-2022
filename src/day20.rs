@@ -1,9 +1,9 @@
 use std::collections::VecDeque;
 use aoc_runner_derive::aoc;
 
-fn print(bowl: &VecDeque<(usize, i64)>) -> String {
-    format!("{:?}", bowl.iter().map(|n| n.1).collect::<Vec<i64>>())
-}
+// fn print(bowl: &VecDeque<(usize, i64)>) -> String {
+//     format!("{:?}", bowl.iter().map(|n| n.1).collect::<Vec<i64>>())
+// }
 
 fn part1_solve(input: &str) -> i64 {
     // all ze numbaz

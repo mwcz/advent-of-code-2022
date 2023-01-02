@@ -1,0 +1,90 @@
+use std::{cmp::Ordering::{Equal, Greater, Less}, collections::HashMap, ops::Div};
+use aoc_runner_derive::aoc;
+
+type Name = String;
+type Operator = char;
+enum Value {
+    Resolved(i32),
+    Pending(Formula)
+}
+type Formula = (Name, Operator, Name);
+
+fn part1_solve(input: &str) -> i64 {
+    let mut vals: HashMap<Name, Value> = HashMap::new();
+    let mut cmds: Vec<_> = input
+        .lines()
+        .map(|line| {
+            line.split_whitespace()
+                .map(|w| w.replace(':', ""))
+                .collect::<Vec<String>>()
+        })
+        .collect();
+
+    // Sorting not working well enough...
+    // cmds.sort_by(|a, b| {
+    //     if b[0] == "root".to_string() {
+    //         Less
+    //     } else if a[0] == "root".to_string() {
+    //         Greater // always put root at the end
+    //     } else if a.len() == 2 && b.len() == 4 {
+    //         Less // put numbers first
+    //     } else if a.len() == 4 && b.len() == 2 {
+    //         Greater 
+    //     } else if a.len() == 2 && b.len() == 2 {
+    //         a[1].cmp(&b[1])
+    //     } else if a.len() == 4 && b.len() == 4 {
+    //         // both are formula, sort by dependency
+    //         if a[0] == b[1] || a[0] == b[3] {
+    //             Less
+    //         } else if b[0] == a[1] || b[0] == a[3] {
+    //             Greater
+    //         } else {
+    //             Equal
+    //         }
+    //     } else {
+    //         Equal
+    //     }
+    // });
+
+    for line in cmds {
+        println!("{:?}", line);
+    }
+
+    0
+}
+
+#[aoc(day21, part1)]
+fn part1_solver(input: &str) -> i64 {
+    part1_solve(input)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    const EX: &str = "root: pppw + sjmn
+dbpl: 5
+cczh: sllz + lgvd
+zczc: 2
+ptdq: humn - dvpt
+dvpt: 3
+lfqf: 4
+humn: 5
+ljgn: 2
+sjmn: drzm * dbpl
+sllz: 4
+pppw: cczh / lfqf
+lgvd: ljgn * ptdq
+drzm: hmdt - zczc
+hmdt: 32";
+
+    #[test]
+    fn day21_part1_test() {
+        assert_eq!(part1_solve(EX), 150);
+    }
+
+    // #[test]
+    // fn day21_part2_test() {
+    //     assert_eq!(part2_solve(EX), 1623178306);
+    // }
+}

@@ -22,10 +22,6 @@ impl Amount {
             geo,
         }
     }
-    fn in_the_black(&self) -> bool {
-        // don't bother checking for geos, they'll always be >= 0 since we can't spend them
-        self.ore >= 0 && self.clay >= 0 && self.obs >= 0
-    }
 }
 
 impl Add for Amount {
@@ -263,7 +259,7 @@ fn part1_solve(input: &str) -> i32 {
         rate: Amount,
     ) {
         // // the most geos we could get if we build a geobot every remaining minute
-        let max_buildable = 1 + minutes * (minutes + 1) / 2;
+        // let max_buildable = 1 + minutes * (minutes + 1) / 2;
 
         // // bail if we couldn't possibly make enough geo bots to match the current max
         // let cant_exceed_max = wallet.geo + rate.geo * (minutes - 1) + max_buildable <= *max;
