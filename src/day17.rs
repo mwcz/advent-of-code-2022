@@ -209,9 +209,9 @@ impl<'a> Chamber<'a> {
 
             self.rock_count += 1;
 
-            if self.rock_count % 10000000 == 0 {
-                println!("{}", (self.rock_count as f32) / 1000000000000.0);
-            }
+            // if self.rock_count % 10000000 == 0 {
+            //     println!("{}", (self.rock_count as f32) / 1000000000000.0);
+            // }
 
             'outer: loop {
                 // push
@@ -307,7 +307,7 @@ impl<'a> Chamber<'a> {
             // applied to each new shape, and maybe only exact same rock formations can cause the
             // jets and shapes to line up again.  There are a prime number of jets in my input
             // (10091), and 5 shapes.
-            if self.rock_count > 2022 && extra == 0 {
+            if extra == 0 {
                 let key = MemoKey { shape_idx: self.shape_idx, jet_idx: self.jet_idx };
                 if memo.contains_key(&key) {
                     let val = memo.get(&key).unwrap();
