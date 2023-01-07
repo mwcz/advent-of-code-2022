@@ -154,7 +154,7 @@ fn part2_solve(input: &str) -> i128 {
     let root: Value = *vals.get("root").unwrap();
 
     // first operand of root's formula
-    let Value::Pending((_, (a, op, b))) = root else {
+    let Value::Pending((_, (a, _op, b))) = root else {
         panic!("root must start pending");
     };
     let root_a = a;
