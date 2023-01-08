@@ -22,7 +22,7 @@ impl Steps {
                 pair(one_of("LR"), complete::i32),
                 |pair: (char, i32)| {
                     dir = dir.turn(pair.0);
-                    (dir.clone(), pair.1)
+                    (dir, pair.1)
                 },
             )))(moves);
             steps
@@ -54,7 +54,7 @@ struct Map {
     grid: Vec<Vec<Cell>>,
     /// The min and max bounds where non-void cells lie.  Used for wrapping around when stepping
     /// into the void.  (row_bounds, col_bounds)
-    bounds: (Vec<(usize, usize)>, Vec<(usize, usize)>),
+    bounds: (Vec<Point>, Vec<Point>),
 }
 
 impl Map {
@@ -84,29 +84,29 @@ impl Map {
                 .find(|n| n.1 != &Cell::Void)
                 .unwrap()
                 .0;
-            bounds.0.push((min_bound, max_bound));
+            bounds.0.push(Point(min_bound, max_bound));
         }
         for col_idx in 0..grid[0].len() {
             let mut min_bound = grid.len();
             let mut max_bound = 0;
 
-            for row_idx in 0..grid.len() {
-                let cell = &grid[row_idx][col_idx];
+            for (row_idx, row) in grid.iter().enumerate() {
+                let cell = &row[col_idx];
                 if cell != &Cell::Void {
                     min_bound = row_idx;
                     break;
                 }
             }
 
-            for row_idx in (0..grid.len()).rev() {
-                let cell = &grid[row_idx][col_idx];
+            for (row_idx, row) in grid.iter().enumerate().rev() {
+                let cell = &row[col_idx];
                 if cell != &Cell::Void {
                     max_bound = row_idx;
                     break;
                 }
             }
 
-            bounds.1.push((min_bound, max_bound));
+            bounds.1.push(Point(min_bound, max_bound));
         }
 
         Self { grid, bounds }
@@ -138,7 +138,7 @@ impl Map {
     }
 
     fn next_point(&self, cur: &Point, dir: &Dir) -> Point {
-        return match dir {
+        match dir {
             Dir::Up => {
                 let up_y = (self.grid.len() + cur.1 - 1) % self.grid.len();
                 match self.grid[up_y][cur.0] {
@@ -199,7 +199,7 @@ impl Map {
                     }
                 }
             }
-        };
+        }
     }
 }
 
@@ -284,7 +284,7 @@ fn part1_solve(input: &str) -> usize {
     // println!("start: {pos:?}");
 
     for step in &steps.0 {
-        pos = map.step(&pos, &step);
+        pos = map.step(&pos, step);
         dir = step.0;
     }
 

@@ -79,7 +79,7 @@ fn part2_solve(input: &str) -> i64 {
                 // the right
                 bowl.rotate_right(bowl.len() - num_pos - 1);
                 bowl.pop_back();
-                let num_us = (num).abs() as usize;
+                let num_us = (num).unsigned_abs() as usize;
                 bowl.rotate_right(num_us % bowl.len());
                 bowl.push_back((i, *num));
             }
