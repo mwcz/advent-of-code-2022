@@ -7,7 +7,7 @@ use nom::{
     sequence::pair,
     IResult,
 };
-use std::ops::Add;
+use std::{collections::HashMap, ops::Add};
 
 type Step = (Dir, i32);
 
@@ -36,7 +36,7 @@ impl Steps {
     }
 }
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 struct Point(usize, usize);
 
 impl Add<Point> for Point {
@@ -55,6 +55,7 @@ struct Map {
     /// The min and max bounds where non-void cells lie.  Used for wrapping around when stepping
     /// into the void.  (row_bounds, col_bounds)
     bounds: (Vec<Point>, Vec<Point>),
+    net_portals: HashMap<Point, Point>,
 }
 
 impl Map {
@@ -109,7 +110,85 @@ impl Map {
             bounds.1.push(Point(min_bound, max_bound));
         }
 
-        Self { grid, bounds }
+        // Find a concave right angle in the net, to be a starting point for zipping the cube back
+        // together.  Returns the point where the nook is and the directions of each line coming out
+        // of it.
+        // TODO find this dynamically
+        let seam_start = (Point(8, 4), Dir::Left, Dir::Up); // for the example
+                                                            // let seam_start = (Point(50, 100), Dir::Left, Dir::Up);
+
+        let mut net_portals = HashMap::new();
+
+        // zip the seam back together
+
+        let mut dir_a = seam_start.1;
+        let mut point_a = seam_start.0 + dir_a;
+        let mut dir_b = seam_start.2;
+        let mut point_b = seam_start.0 + dir_b;
+
+        while point_a != point_b {
+            let next_a = point_a;
+            let cell_a = match grid.get(next_a.1) {
+                Some(row) => row.get(next_a.0).unwrap_or(&Cell::Void),
+                None => &Cell::Void,
+            };
+            let next_b = point_b;
+            let cell_b = match grid.get(next_b.1) {
+                Some(row) => row.get(next_b.0).unwrap_or(&Cell::Void),
+                None => &Cell::Void,
+            };
+
+            println!("a: {point_a:?} goes {dir_a:?} to {next_a:?} which is {cell_a:?}");
+            println!("b: {point_b:?} goes {dir_b:?} to {next_b:?} which is {cell_b:?}");
+            // println!("{point_b:?} going {dir_b:?}");
+            use Dir::*;
+
+                (dir_a, dir_b) = match (cell_a == &Cell::Void, cell_b == &Cell::Void, dir_a, dir_b) {
+                    (true, true, Up, Right) => (Left, Down),
+                    (true, true, Up, Left) => (Right, Down),
+                    (true, true, Right, Up) => (Down, Left),
+                    (true, true, Right, Down) => (Up, Left),
+                    (true, true, Down, Right) => (Left, Up),
+                    (true, true, Down, Left) => (Right, Up),
+                    (true, true, Left, Up) => todo!(),
+                    (true, true, Left, Down) => todo!(),
+                    (true, false, Up, Right) => todo!(),
+                    (true, false, Up, Left) => todo!(),
+                    (true, false, Right, Up) => todo!(),
+                    (true, false, Right, Down) => todo!(),
+                    (true, false, Down, Right) => todo!(),
+                    (true, false, Down, Left) => todo!(),
+                    (true, false, Left, Up) => todo!(),
+                    (true, false, Left, Down) => todo!(),
+                    (false, true, Up, Right) => todo!(),
+                    (false, true, Up, Left) => todo!(),
+                    (false, true, Right, Up) => todo!(),
+                    (false, true, Right, Down) => todo!(),
+                    (false, true, Down, Right) => todo!(),
+                    (false, true, Down, Left) => todo!(),
+                    (false, true, Left, Up) => todo!(),
+                    (false, true, Left, Down) => todo!(),
+                    (false, false, Up, Right) => todo!(),
+                    (false, false, Up, Left) => todo!(),
+                    (false, false, Right, Up) => todo!(),
+                    (false, false, Right, Down) => todo!(),
+                    (false, false, Down, Right) => todo!(),
+                    (false, false, Down, Left) => todo!(),
+                    (false, false, Left, Up) => todo!(),
+                    (false, false, Left, Down) => todo!(),
+                };
+
+            point_a = next_a + dir_a;
+            point_b = next_b + dir_b;
+
+            break;
+        }
+
+        Self {
+            grid,
+            bounds,
+            net_portals,
+        }
     }
 
     /// Find the starting point on the map. (x, y)
@@ -262,6 +341,19 @@ impl Dir {
     }
 }
 
+impl Add<Dir> for Point {
+    type Output = Point;
+
+    fn add(self, rhs: Dir) -> Self::Output {
+        match rhs {
+            Dir::Up => Point(self.0, self.1.checked_sub(1).unwrap()),
+            Dir::Right => Point(self.0 + 1, self.1),
+            Dir::Down => Point(self.0, self.1 + 1),
+            Dir::Left => Point(self.0.checked_sub(1).unwrap(), self.1),
+        }
+    }
+}
+
 impl From<char> for Cell {
     fn from(value: char) -> Self {
         match value {
@@ -299,6 +391,27 @@ fn part1_solve(input: &str) -> usize {
 #[aoc(day22, part1)]
 fn part1_solver(input: &str) -> usize {
     part1_solve(input)
+}
+
+fn part2_solve(input: &str) -> usize {
+    let mut parts = input.split("\n\n");
+
+    let map = Map::new(parts.next().unwrap());
+    let steps = Steps::new(parts.next().unwrap());
+
+    let (mut pos, mut dir) = map.start_pos();
+
+    for step in &steps.0 {
+        pos = map.step(&pos, step);
+        dir = step.0;
+    }
+
+    1000 * (pos.1 + 1) + 4 * (pos.0 + 1) + dir.score()
+}
+
+#[aoc(day22, part2)]
+fn part2_solver(input: &str) -> usize {
+    part2_solve(input)
 }
 
 #[cfg(test)]
@@ -358,8 +471,8 @@ mod tests {
         assert_eq!(part1_solve(REAL), 146092);
     }
 
-    // #[test]
-    // fn day22_part2_test() {
-    //     assert_eq!(part2_solve(EX), 301);
-    // }
+    #[test]
+    fn day22_part2_test() {
+        assert_eq!(part2_solve(EX), 5031);
+    }
 }
