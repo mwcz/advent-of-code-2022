@@ -110,78 +110,106 @@ impl Map {
             bounds.1.push(Point(min_bound, max_bound));
         }
 
+        use Dir::*;
         // Find a concave right angle in the net, to be a starting point for zipping the cube back
         // together.  Returns the point where the nook is and the directions of each line coming out
         // of it.
         // TODO find this dynamically
+        const LEN: usize = 4;
         let seam_start = (Point(8, 4), Dir::Left, Dir::Up); // for the example
-                                                            // let seam_start = (Point(50, 100), Dir::Left, Dir::Up);
+
+        // let seam_start = (Point(50, 100), Dir::Left, Dir::Up);
 
         let mut net_portals = HashMap::new();
 
+        /*
+
+                ...#
+                .#..
+                #...
+                ....
+        ...#.......#
+        ........#...
+        ..#....#....
+        ..........#.
+                ...#....
+                .....#..
+                .#......
+                ......#.
+
+                */
+
         // zip the seam back together
 
-        let mut dir_a = seam_start.1;
-        let mut point_a = seam_start.0 + dir_a;
-        let mut dir_b = seam_start.2;
-        let mut point_b = seam_start.0 + dir_b;
+        let mut points = [seam_start.0, seam_start.0];
+        let mut dirs = [seam_start.1, seam_start.2];
 
-        while point_a != point_b {
-            let next_a = point_a;
-            let cell_a = match grid.get(next_a.1) {
-                Some(row) => row.get(next_a.0).unwrap_or(&Cell::Void),
-                None => &Cell::Void,
-            };
-            let next_b = point_b;
-            let cell_b = match grid.get(next_b.1) {
-                Some(row) => row.get(next_b.0).unwrap_or(&Cell::Void),
-                None => &Cell::Void,
-            };
+        let cell = |x: usize, y: usize| -> &Cell {
+            if let Some(row) = grid.get(y) {
+                row.get(x).unwrap_or(&Cell::Void)
+            } else {
+                &Cell::Void
+            }
+        };
 
-            println!("a: {point_a:?} goes {dir_a:?} to {next_a:?} which is {cell_a:?}");
-            println!("b: {point_b:?} goes {dir_b:?} to {next_b:?} which is {cell_b:?}");
-            // println!("{point_b:?} going {dir_b:?}");
+        type Kernel<'a> = [[&'a Cell; 3]; 3];
+        #[rustfmt::skip]
+        let kernel = |p: Point| -> Kernel {[
+            [cell(p.0 - 1, p.1 - 1), cell(p.0, p.1 - 1), cell(p.0 + 1, p.1 - 1)],
+            [cell(p.0 - 1, p.1 + 0), cell(p.0, p.1 + 0), cell(p.0 + 1, p.1 + 0)],
+            [cell(p.0 - 1, p.1 + 1), cell(p.0, p.1 + 1), cell(p.0 + 1, p.1 + 1)],
+        ]};
+
+        // Some(p) if the point at the center of a kernel is where a turn should take place,
+        // pivoting around point p.  If no turn should take place, returns None.
+        let corner = |k: Kernel| -> Option<(Dir, Dir)> {
+            // a kernel contains a corner if one of the following is true:
+            //    1: of the four corners, only a single one is Void
+            //    2: of the four corners, only a single one is not Void
             use Dir::*;
 
-                (dir_a, dir_b) = match (cell_a == &Cell::Void, cell_b == &Cell::Void, dir_a, dir_b) {
-                    (true, true, Up, Right) => (Left, Down),
-                    (true, true, Up, Left) => (Right, Down),
-                    (true, true, Right, Up) => (Down, Left),
-                    (true, true, Right, Down) => (Up, Left),
-                    (true, true, Down, Right) => (Left, Up),
-                    (true, true, Down, Left) => (Right, Up),
-                    (true, true, Left, Up) => todo!(),
-                    (true, true, Left, Down) => todo!(),
-                    (true, false, Up, Right) => todo!(),
-                    (true, false, Up, Left) => todo!(),
-                    (true, false, Right, Up) => todo!(),
-                    (true, false, Right, Down) => todo!(),
-                    (true, false, Down, Right) => todo!(),
-                    (true, false, Down, Left) => todo!(),
-                    (true, false, Left, Up) => todo!(),
-                    (true, false, Left, Down) => todo!(),
-                    (false, true, Up, Right) => todo!(),
-                    (false, true, Up, Left) => todo!(),
-                    (false, true, Right, Up) => todo!(),
-                    (false, true, Right, Down) => todo!(),
-                    (false, true, Down, Right) => todo!(),
-                    (false, true, Down, Left) => todo!(),
-                    (false, true, Left, Up) => todo!(),
-                    (false, true, Left, Down) => todo!(),
-                    (false, false, Up, Right) => todo!(),
-                    (false, false, Up, Left) => todo!(),
-                    (false, false, Right, Up) => todo!(),
-                    (false, false, Right, Down) => todo!(),
-                    (false, false, Down, Right) => todo!(),
-                    (false, false, Down, Left) => todo!(),
-                    (false, false, Left, Up) => todo!(),
-                    (false, false, Left, Down) => todo!(),
-                };
+            let corners = [
+                (k[0][0], (Left, Up)),
+                (k[0][2], (Right, Up)),
+                (k[2][0], (Left, Down)),
+                (k[0][2], (Right, Down)),
+            ];
+            let voids = corners
+                .iter()
+                .fold(0, |acc, (p, _)| if *p == &Cell::Void { 1 } else { 0 });
 
-            point_a = next_a + dir_a;
-            point_b = next_b + dir_b;
+            match voids {
+                1 => Some(
+                    corners.iter().find(|(p, _)| *p == &Cell::Void).unwrap().1,
+                ),
+                3 => Some(
+                    corners.iter().find(|(p, _)| *p != &Cell::Void).unwrap().1,
+                ),
+                _ => None,
+            }
+        };
+        // TODO resume here, test out corner()
+
+        loop {
+            // turning occupies one iteration, since the corner is attached to two other points
+
+            println!("a: {:?} goes {:?}", points[0], dirs[0]);
+            println!("b: {:?} goes {:?}", points[1], dirs[1]);
+            points[0] = points[0] + dirs[0];
+            points[1] = points[1] + dirs[1];
+
+            // check for a turn
+            // [[Cell; 3]; 3]
+            let kernels: [Kernel; 2] = points.map(kernel);
+
+            println!("{:#?}", kernels);
 
             break;
+
+            if points[0] == points[1] {
+                // reached the end of the seam
+                break;
+            }
         }
 
         Self {
