@@ -138,7 +138,9 @@ fn part2_solve(input: &str) -> usize {
         for item in &triplet[2] {
             // if the prime evently divides into compartment 1's product, then the letter exists in
             // that compartment too, so it's what we're looking for.
-            if &comp0_product % item.prime == BigUint::from(0u32) && &comp1_product % item.prime == BigUint::from(0u32) {
+            if &comp0_product % item.prime == BigUint::from(0u32)
+                && &comp1_product % item.prime == BigUint::from(0u32)
+            {
                 priority_sum += item.priority;
                 break;
             }

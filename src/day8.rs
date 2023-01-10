@@ -109,7 +109,7 @@ impl<const SIZE: usize> Forest<SIZE> {
                 break;
             }
         }
-        for right_idx in (x+1)..SIZE {
+        for right_idx in (x + 1)..SIZE {
             scores[1] += 1;
             if self.trees[y][right_idx] >= height {
                 break;
@@ -121,7 +121,7 @@ impl<const SIZE: usize> Forest<SIZE> {
                 break;
             }
         }
-        for bottom_idx in (y+1)..SIZE {
+        for bottom_idx in (y + 1)..SIZE {
             scores[2] += 1;
             if self.trees[bottom_idx][x] >= height {
                 break;

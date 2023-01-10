@@ -137,7 +137,12 @@ impl<'inode> Filesystem<'inode> {
     }
 
     fn used_space(&self) -> u32 {
-        self.dir_size(self.inodes.iter().find(|&inode| inode.name == "/").map(|inode| inode.idx))
+        self.dir_size(
+            self.inodes
+                .iter()
+                .find(|&inode| inode.name == "/")
+                .map(|inode| inode.idx),
+        )
     }
 
     fn free_up(&self, total: u32, needed: u32) -> Option<u32> {
@@ -153,7 +158,8 @@ impl<'inode> Filesystem<'inode> {
                     }
                 }
                 None
-            }).min()
+            })
+            .min()
     }
 }
 
@@ -172,7 +178,8 @@ fn part2_solve(input: &str) -> u32 {
 
     let fs = Filesystem::new(entries);
 
-    fs.free_up(70_000_000, 30_000_000).expect("no dir found that can free up enough space")
+    fs.free_up(70_000_000, 30_000_000)
+        .expect("no dir found that can free up enough space")
 }
 
 #[test]
@@ -208,4 +215,3 @@ $ ls
     );
     assert_eq!(ex.sum_under(100000), 95437);
 }
-

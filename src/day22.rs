@@ -36,7 +36,7 @@ impl Steps {
     }
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 struct Point(usize, usize);
 
 impl Add<Point> for Point {
@@ -115,10 +115,9 @@ impl Map {
         // together.  Returns the point where the nook is and the directions of each line coming out
         // of it.
         // TODO find this dynamically
-        const LEN: usize = 4;
         let seam_start = (Point(8, 4), Dir::Left, Dir::Up); // for the example
 
-        // let seam_start = (Point(50, 100), Dir::Left, Dir::Up);
+        // let seam_start = (Point(50, 100), Dir::Left, Dir::Up); // for the real input
 
         let mut net_portals = HashMap::new();
 
@@ -141,12 +140,19 @@ impl Map {
 
         // zip the seam back together
 
-        let mut points = [seam_start.0, seam_start.0];
         let mut dirs = [seam_start.1, seam_start.2];
+        let mut points = [seam_start.0, seam_start.0];
+        let mut just_turned = [false, false];
 
-        let cell = |x: usize, y: usize| -> &Cell {
-            if let Some(row) = grid.get(y) {
-                row.get(x).unwrap_or(&Cell::Void)
+        let cell = |x: usize, x_off: isize, y: usize, y_off: isize| -> &Cell {
+            let Some(new_x) = x.checked_add_signed(x_off) else { 
+                return &Cell::Void;
+            };
+            let Some(new_y) = y.checked_add_signed(y_off) else {
+                return &Cell::Void;
+            };
+            if let Some(row) = grid.get(new_y) {
+                row.get(new_x).unwrap_or(&Cell::Void)
             } else {
                 &Cell::Void
             }
@@ -155,59 +161,111 @@ impl Map {
         type Kernel<'a> = [[&'a Cell; 3]; 3];
         #[rustfmt::skip]
         let kernel = |p: Point| -> Kernel {[
-            [cell(p.0 - 1, p.1 - 1), cell(p.0, p.1 - 1), cell(p.0 + 1, p.1 - 1)],
-            [cell(p.0 - 1, p.1 + 0), cell(p.0, p.1 + 0), cell(p.0 + 1, p.1 + 0)],
-            [cell(p.0 - 1, p.1 + 1), cell(p.0, p.1 + 1), cell(p.0 + 1, p.1 + 1)],
+            [cell(p.0, -1, p.1, -1), cell(p.0, 0, p.1, -1), cell(p.0, 1, p.1, -1)],
+            [cell(p.0, -1, p.1,  0), cell(p.0, 0, p.1,  0), cell(p.0, 1, p.1,  0)],
+            [cell(p.0, -1, p.1,  1), cell(p.0, 0, p.1,  1), cell(p.0, 1, p.1,  1)],
         ]};
 
-        // Some(p) if the point at the center of a kernel is where a turn should take place,
-        // pivoting around point p.  If no turn should take place, returns None.
+        // Some(p) if the point at the center of a kernel is where a turn should take place because
+        // it's a corner, either concave or convex, along the cube net's seam. If no turn should
+        // take place, returns None.
         let corner = |k: Kernel| -> Option<(Dir, Dir)> {
             // a kernel contains a corner if one of the following is true:
-            //    1: of the four corners, only a single one is Void
-            //    2: of the four corners, only a single one is not Void
+            //    a: if there are 5 voids in in the kernel, center is a convex corner
+            //    b: if there is 1 void in the kernel, center is a concave corner
             use Dir::*;
 
             let corners = [
                 (k[0][0], (Left, Up)),
                 (k[0][2], (Right, Up)),
                 (k[2][0], (Left, Down)),
-                (k[0][2], (Right, Down)),
+                (k[2][2], (Right, Down)),
             ];
-            let voids = corners
-                .iter()
-                .fold(0, |acc, (p, _)| if *p == &Cell::Void { 1 } else { 0 });
+
+            let voids = k.iter().flatten().filter(|&p| *p == &Cell::Void).count();
+
+            // println!();
+            // println!("kernel: {k:#?}", );
+            // println!("corners: {corners:#?}", );
+            // println!("found {voids} voids", );
 
             match voids {
-                1 => Some(
-                    corners.iter().find(|(p, _)| *p == &Cell::Void).unwrap().1,
-                ),
-                3 => Some(
-                    corners.iter().find(|(p, _)| *p != &Cell::Void).unwrap().1,
-                ),
+                // concave corner
+                1 => Some(corners.iter().find(|(p, _)| *p == &Cell::Void).unwrap().1),
+                // convex corner
+                5 => Some(corners.iter().find(|(p, _)| *p != &Cell::Void).unwrap().1),
+                // no corner
                 _ => None,
             }
         };
         // TODO resume here, test out corner()
 
+        let mut i = 0;
         loop {
             // turning occupies one iteration, since the corner is attached to two other points
+            i += 1;
 
-            println!("a: {:?} goes {:?}", points[0], dirs[0]);
-            println!("b: {:?} goes {:?}", points[1], dirs[1]);
-            points[0] = points[0] + dirs[0];
-            points[1] = points[1] + dirs[1];
+            println!("##############################");
+            println!("Step {i}");
+            println!("a @ {:?} b@ {:?}", points[0], points[1]);
 
             // check for a turn
-            // [[Cell; 3]; 3]
             let kernels: [Kernel; 2] = points.map(kernel);
 
-            println!("{:#?}", kernels);
+            let corners: [Option<(Dir, Dir)>; 2] = kernels.map(corner);
 
-            break;
+            println!("{:#?}", corners);
+
+            // TODO if _both_ points turn at the same time, this algorithm needs to be restarted at
+            // another one of the starting nooks
+
+            // either turn or move
+            if just_turned[0] {
+                just_turned[0] = false;
+            } else {
+                if let Some(corner) = corners[0] {
+                    dirs[0] = match dirs[0] {
+                        Up => corner.0,
+                        Right => corner.1,
+                        Down => corner.0,
+                        Left => corner.1,
+                    };
+                    just_turned[0] = true;
+                    println!("a turns {:?}", dirs[0]);
+                }
+            }
+            if just_turned[1] {
+                just_turned[1] = false;
+            } else {
+                if let Some(corner) = corners[1] {
+                    dirs[1] = match dirs[1] {
+                        Up => corner.0,
+                        Right => corner.1,
+                        Down => corner.0,
+                        Left => corner.1,
+                    };
+                    just_turned[1] = true;
+                    println!("b turns {:?}", dirs[1]);
+                }
+            }
+            if !just_turned[0] {
+                points[0] = points[0] + dirs[0];
+                println!("a goes {:?} to {:?}", dirs[0], points[0]);
+            }
+            if !just_turned[1] {
+                points[1] = points[1] + dirs[1];
+                println!("a goes {:?} to {:?}", dirs[1], points[1]);
+            }
 
             if points[0] == points[1] {
                 // reached the end of the seam
+                break;
+            }
+
+            net_portals.insert(points[0], points[1]);
+            net_portals.insert(points[1], points[0]);
+
+            if i > 30 {
                 break;
             }
         }
@@ -327,36 +385,10 @@ enum Dir {
 
 impl Dir {
     fn turn(&self, lr: char) -> Self {
-        use Dir::*;
-        match self {
-            Up => {
-                if lr == 'L' {
-                    Left
-                } else {
-                    Right
-                }
-            }
-            Right => {
-                if lr == 'L' {
-                    Up
-                } else {
-                    Down
-                }
-            }
-            Down => {
-                if lr == 'L' {
-                    Right
-                } else {
-                    Left
-                }
-            }
-            Left => {
-                if lr == 'L' {
-                    Down
-                } else {
-                    Up
-                }
-            }
+        if lr == 'L' {
+            self.ccw()
+        } else {
+            self.cw()
         }
     }
     fn score(&self) -> usize {
@@ -365,6 +397,22 @@ impl Dir {
             Dir::Left => 2,
             Dir::Right => 0,
             Dir::Up => 3,
+        }
+    }
+    fn cw(&self) -> Self {
+        match self {
+            Dir::Up => Dir::Right,
+            Dir::Right => Dir::Down,
+            Dir::Down => Dir::Left,
+            Dir::Left => Dir::Up,
+        }
+    }
+    fn ccw(&self) -> Self {
+        match self {
+            Dir::Up => Dir::Left,
+            Dir::Right => Dir::Up,
+            Dir::Down => Dir::Right,
+            Dir::Left => Dir::Down,
         }
     }
 }

@@ -1,5 +1,5 @@
 use std::{
-    collections::{VecDeque, HashMap},
+    collections::{HashMap, VecDeque},
     iter::{Cycle, Enumerate},
     slice::Iter,
     str::Chars,
@@ -219,7 +219,6 @@ impl<'a> Chamber<'a> {
                 self.jet_idx = jet_idx;
                 // println!("{}", self.to_string(Some((mask, y))));
 
-
                 let mut shifted_mask = mask.map(|_| None);
 
                 for (shape_y, row) in mask.iter().enumerate() {
@@ -308,7 +307,10 @@ impl<'a> Chamber<'a> {
             // jets and shapes to line up again.  There are a prime number of jets in my input
             // (10091), and 5 shapes.
             if extra == 0 {
-                let key = MemoKey { shape_idx: self.shape_idx, jet_idx: self.jet_idx };
+                let key = MemoKey {
+                    shape_idx: self.shape_idx,
+                    jet_idx: self.jet_idx,
+                };
                 if memo.contains_key(&key) {
                     let val = memo.get(&key).unwrap();
                     let rock_diff = self.rock_count - val.rock_count;
@@ -319,14 +321,16 @@ impl<'a> Chamber<'a> {
                     self.rock_count += repeat * rock_diff;
                     extra += repeat * peak_diff;
                 } else {
-                    memo.insert(key, MemoVal {
-                        peak: self.peak,
-                        rock_count: self.rock_count,
-                    });
+                    memo.insert(
+                        key,
+                        MemoVal {
+                            peak: self.peak,
+                            rock_count: self.rock_count,
+                        },
+                    );
                 }
             }
             // println!("{}", self.to_string(Some((mask, y))));
-
         }
         self.peak + extra
     }

@@ -17,11 +17,9 @@ fn cd(input: &str) -> IResult<&str, Log> {
 }
 
 fn file(input: &str) -> IResult<&str, Log> {
-    map(tuple((nom_u32, space1, not_line_ending)), |tup| {
-        Log::File {
-            name: tup.2,
-            size: tup.0,
-        }
+    map(tuple((nom_u32, space1, not_line_ending)), |tup| Log::File {
+        name: tup.2,
+        size: tup.0,
     })(input)
 }
 
@@ -57,4 +55,3 @@ fn parse_test() {
         ))
     );
 }
-

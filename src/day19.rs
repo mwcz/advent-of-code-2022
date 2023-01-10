@@ -349,7 +349,6 @@ fn part1_solve(input: &str) -> i32 {
         .sum()
 }
 
-
 #[aoc(day19, part2)]
 fn part2_solve(input: &str) -> i32 {
     let blueprint: Vec<Blueprint> = input
@@ -378,9 +377,7 @@ fn part2_solve(input: &str) -> i32 {
         let cant_exceed_max = wallet.geo + rate.geo * minutes + max_buildable <= *max;
 
         // base case
-        if minutes == 0
-        || cant_exceed_max
-        {
+        if minutes == 0 || cant_exceed_max {
             if wallet.geo > *max {
                 println!(
                     "  blueprint {} got {} geodes: quality score {}",
@@ -423,7 +420,16 @@ fn part2_solve(input: &str) -> i32 {
                 // not enough time to build this bot, so just spin down the clock at the current rate
                 // (the call to search will catch the base case)
                 let new_wallet = wallet + rate * minutes;
-                search(strats, steps.clone(), max, bp, 0, new_wallet, rate, total_minutes);
+                search(
+                    strats,
+                    steps.clone(),
+                    max,
+                    bp,
+                    0,
+                    new_wallet,
+                    rate,
+                    total_minutes,
+                );
             } else {
                 let new_wallet = spent_wallet + rate * time_to_build;
                 let new_rate = rate + bot.rate();
@@ -432,7 +438,16 @@ fn part2_solve(input: &str) -> i32 {
                 let mut new_steps = steps.clone();
                 new_steps.push((*bot, 24 - new_minute + 1));
 
-                search(strats, new_steps, max, bp, new_minute, new_wallet, new_rate, total_minutes);
+                search(
+                    strats,
+                    new_steps,
+                    max,
+                    bp,
+                    new_minute,
+                    new_wallet,
+                    new_rate,
+                    total_minutes,
+                );
             }
         }
     }
@@ -452,15 +467,11 @@ fn part2_solve(input: &str) -> i32 {
     strats
         .iter()
         .map(|(bp, geos)| {
-            println!(
-                "Blueprint {} got {} geos",
-                bp.id, geos
-            );
+            println!("Blueprint {} got {} geos", bp.id, geos);
             geos
         })
         .product()
 }
-
 
 #[cfg(test)]
 mod tests {

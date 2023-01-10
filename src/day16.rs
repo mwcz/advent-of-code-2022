@@ -182,14 +182,7 @@ impl<'input> Cave<'input> {
                 score + rate * arrival_time,
             ));
 
-            self.visit(
-                visited,
-                path.clone(),
-                paths,
-                rate,
-                score,
-                arrival_time,
-            );
+            self.visit(visited, path.clone(), paths, rate, score, arrival_time);
         }
     }
 
@@ -246,14 +239,7 @@ fn part1_solve(input: &str) -> u16 {
 
     if let Some(start) = cave.start {
         let mut answer = Vec::new();
-        cave.visit(
-            start.mask,
-            vec![start.mask],
-            &mut answer,
-            0,
-            0,
-            30,
-        );
+        cave.visit(start.mask, vec![start.mask], &mut answer, 0, 0, 30);
         answer.into_iter().map(|p| p.1).max().unwrap()
     } else {
         0
@@ -267,14 +253,7 @@ fn part2_solve(input: &str) -> u16 {
 
     if let Some(start) = cave.start {
         let mut answer = Vec::new();
-        cave.visit(
-            start.mask,
-            vec![start.mask],
-            &mut answer,
-            0,
-            0,
-            26,
-        );
+        cave.visit(start.mask, vec![start.mask], &mut answer, 0, 0, 26);
 
         let mut score = 0;
 

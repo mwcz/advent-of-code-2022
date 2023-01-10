@@ -163,7 +163,11 @@ fn part2_solve(input: &str) -> i128 {
     let que_a = VecDeque::from([*vals.get(root_a).unwrap()]);
     let que_b = VecDeque::from([*vals.get(root_b).unwrap()]);
 
-    fn solve<'a>(mut que: VecDeque<Value<'a>>, mut vals: HashMap<Name<'a>, Value<'a>>, root: &str) -> Option<i128> {
+    fn solve<'a>(
+        mut que: VecDeque<Value<'a>>,
+        mut vals: HashMap<Name<'a>, Value<'a>>,
+        root: &str,
+    ) -> Option<i128> {
         while !que.is_empty() {
             let next = que.back().unwrap();
 
@@ -229,7 +233,8 @@ fn part2_solve(input: &str) -> i128 {
         Some(0)
     }
 
-    solve(que_a, vals.clone(), root_a).unwrap_or_else(|| solve(que_b, vals.clone(), root_b).unwrap())
+    solve(que_a, vals.clone(), root_a)
+        .unwrap_or_else(|| solve(que_b, vals.clone(), root_b).unwrap())
 }
 
 #[aoc(day21, part1)]

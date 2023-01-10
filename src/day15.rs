@@ -65,10 +65,7 @@ fn part1_solve(input: &str, row: i64) -> usize {
 
     let mut no_count = 0;
     'outer: for x in x_min..=x_max {
-        let p = Point {
-            x,
-            y: row,
-        };
+        let p = Point { x, y: row };
 
         // check each record to see if p's dist to the sensor is less than its dist to the beacon,
         // if true then inc no_count
@@ -159,7 +156,7 @@ fn part2_solve(input: &str, size: i64) -> i64 {
         point.y = point.y - record.dist - 1;
 
         // loop over every cell in the perimeter
-        for _ in 0..(4*(record.dist+1)) {
+        for _ in 0..(4 * (record.dist + 1)) {
             point.x += dir.0;
             point.y += dir.1;
 
@@ -169,8 +166,7 @@ fn part2_solve(input: &str, size: i64) -> i64 {
             }
 
             for r in &records {
-                if point.dist(&r.sensor) > r.dist {
-                }
+                if point.dist(&r.sensor) > r.dist {}
             }
 
             if records.iter().all(|r| point.dist(&r.sensor) > r.dist) {
@@ -186,7 +182,6 @@ fn part2_solve(input: &str, size: i64) -> i64 {
                 dir = ur;
             }
         }
-
     }
 
     unreachable!();
