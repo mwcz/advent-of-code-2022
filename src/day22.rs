@@ -1,4 +1,5 @@
 use aoc_runner_derive::aoc;
+use console_engine::{KeyCode, ConsoleEngine};
 use itertools::Itertools;
 use nom::{
     character::complete::{self, one_of},
@@ -73,7 +74,7 @@ impl Map {
             row.resize_with(max_row_len, || Cell::Void);
         }
 
-        // calculate bounds
+        // calculate bounds (used in part 1)
 
         let mut bounds = (vec![], vec![]);
         for row in &grid {
@@ -141,6 +142,7 @@ impl Map {
         // zip the seam back together
 
         let mut dirs = [seam_start.1, seam_start.2];
+        let mut entdir = [seam_start.1, seam_start.2];
         let mut points = [seam_start.0, seam_start.0];
         let mut just_turned = [false, false];
 
@@ -159,6 +161,7 @@ impl Map {
         };
 
         type Kernel<'a> = [[&'a Cell; 3]; 3];
+
         #[rustfmt::skip]
         let kernel = |p: Point| -> Kernel {[
             [cell(p.0, -1, p.1, -1), cell(p.0, 0, p.1, -1), cell(p.0, 1, p.1, -1)],
@@ -200,21 +203,58 @@ impl Map {
         };
         // TODO resume here, test out corner()
 
+        let mut engine = ConsoleEngine::init(16, 13, 2).unwrap();
+
+        let mut print_grid = |i: i32, points: &[Point; 2],dirs: &[Dir; 2], net_portals: &HashMap<Point, Point>, engine: &mut ConsoleEngine| {
+            engine.wait_frame();
+            engine.clear_screen();
+
+            engine.print(0, 12, &format!("iteration {}", i));
+
+            for (y, row) in grid.iter().enumerate() {
+                for (x, cell) in row.iter().enumerate() {
+                    let p = Point(x, y);
+                    let x = x as i32;
+                    let y = y as i32;
+                    if let Some(portal) = net_portals.get(&p) {
+                        engine.print(x, y, "O");
+                        // print!("O");
+                    } else if points[0] == p {
+                        engine.print(x, y, dirs[0].into());
+                        // print!("{}", char::from(dirs[0]));
+                    } else if points[1] == p {
+                        engine.print(x, y, dirs[1].into());
+                        // print!("{}", char::from(dirs[1]));
+                    } else {
+                        engine.print(x, y, cell.into());
+                        // print!("{}", char::from(cell));
+                    }
+                }
+                // println!();
+            }
+
+            engine.draw();
+        };
+
         let mut i = 0;
         loop {
             // turning occupies one iteration, since the corner is attached to two other points
             i += 1;
 
-            println!("##############################");
-            println!("Step {i}");
-            println!("a @ {:?} b@ {:?}", points[0], points[1]);
+            if engine.is_key_pressed(KeyCode::Char('q')) {
+                break;
+            }
+
+            // println!("##############################");
+            // println!("Step {i}");
+            // println!("a @ {:?} b@ {:?}", points[0], points[1]);
 
             // check for a turn
             let kernels: [Kernel; 2] = points.map(kernel);
 
             let corners: [Option<(Dir, Dir)>; 2] = kernels.map(corner);
 
-            println!("{:#?}", corners);
+            // println!("{:#?}", corners);
 
             // TODO if _both_ points turn at the same time, this algorithm needs to be restarted at
             // another one of the starting nooks
@@ -231,7 +271,7 @@ impl Map {
                         Left => corner.1,
                     };
                     just_turned[0] = true;
-                    println!("a turns {:?}", dirs[0]);
+                    // println!("a turns {:?}", dirs[0]);
                 }
             }
             if just_turned[1] {
@@ -245,19 +285,21 @@ impl Map {
                         Left => corner.1,
                     };
                     just_turned[1] = true;
-                    println!("b turns {:?}", dirs[1]);
+                    // println!("b turns {:?}", dirs[1]);
                 }
             }
             if !just_turned[0] {
                 points[0] = points[0] + dirs[0];
-                println!("a goes {:?} to {:?}", dirs[0], points[0]);
+                // println!("a goes {:?} to {:?}", dirs[0], points[0]);
             }
             if !just_turned[1] {
                 points[1] = points[1] + dirs[1];
-                println!("a goes {:?} to {:?}", dirs[1], points[1]);
+                // println!("a goes {:?} to {:?}", dirs[1], points[1]);
             }
 
-            if points[0] == points[1] {
+            print_grid(i, &points, &dirs, &net_portals, &mut engine);
+
+            if i > 1 && points[0] == points[1] {
                 // reached the end of the seam
                 break;
             }
@@ -383,6 +425,17 @@ enum Dir {
     Left,
 }
 
+impl From<Dir> for &str {
+    fn from(value: Dir) -> Self {
+        match value {
+            Dir::Up => "^",
+            Dir::Right => ">",
+            Dir::Down => "v",
+            Dir::Left => "<",
+        }
+    }
+}
+
 impl Dir {
     fn turn(&self, lr: char) -> Self {
         if lr == 'L' {
@@ -439,6 +492,17 @@ impl From<char> for Cell {
         }
     }
 }
+
+impl From<&Cell> for &str {
+    fn from(value: &Cell) -> Self {
+        match value {
+            Cell::Open => ".",
+            Cell::Wall => "#",
+            Cell::Void => " ",
+        }
+    }
+}
+
 
 fn part1_solve(input: &str) -> usize {
     let mut parts = input.split("\n\n");
