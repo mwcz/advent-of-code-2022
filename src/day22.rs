@@ -214,23 +214,25 @@ impl Map {
 
         let start_points = zippers();
 
-        let mut dirs = [seam_start.1, seam_start.2];
-        let mut entdir = [seam_start.1, seam_start.2];
-        let mut points = [seam_start.0, seam_start.0];
-        let mut turning = [false, false];
+        let mut dirs;
+        let mut points;
+        let mut turning;
 
-        let mut engine = ConsoleEngine::init(80, 18, 4).unwrap();
+        let width: u32 = (map_str.lines().next().unwrap().len() + 4).try_into().unwrap();
+        let height: u32 = (map_str.lines().collect_vec().len() + 5).try_into().unwrap();
+        let fps: u32 = 5;
+        let mut engine = ConsoleEngine::init(width, height, fps).unwrap();
 
         let print_grid = |i: i32, points: &[Point; 2],dirs: &[Dir; 2], net_portals: &HashMap<Point, Point>, engine: &mut ConsoleEngine| {
             engine.wait_frame();
             engine.clear_screen();
 
-            engine.print(0, 13, &format!("iteration {}", i));
-            engine.print(0, 14, "O - portal");
-            engine.print(0, 15, "X - concave corner");
-            engine.print(0, 16, "<v^> - agent travel direction");
+            engine.print(0, (height as i32)-4, &format!("iteration {}", i));
+            engine.print(0, (height as i32)-3, "█ - portal");
+            engine.print(0, (height as i32)-2, "X - concave corner");
+            engine.print(0, (height as i32)-1, "<v^> - agent travel direction");
             let starts: Vec<String> = start_points.iter().map(|p| format!("{} {} {}", p.0.to_string(), p.1.0.to_string(), p.1.1.to_string())).collect();
-            engine.print(0, 17, &format!("{}", starts.join(" / ")));
+            engine.print(0, (height as i32), &format!("{}", starts.join(" / ")));
 
             for (y, row) in grid.iter().enumerate() {
                 for (x, cell) in row.iter().enumerate() {
@@ -238,7 +240,7 @@ impl Map {
                     let x = x as i32;
                     let y = y as i32;
                     if let Some(portal) = net_portals.get(&p) {
-                        engine.print(x, y, "O");
+                        engine.print(x, y, "█");
                         // print!("O");
                     } else if start_points.iter().find(|c| c.0 == p).is_some() {
                         engine.print(x, y, "X");
@@ -260,7 +262,6 @@ impl Map {
             let mut ii = 0;
 
             dirs = [start.1.0, start.1.1];
-            entdir = [seam_start.1, seam_start.2];
             points = [start.0 + dirs[0], start.0 + dirs[1]];
             turning = [false, false];
 
@@ -619,5 +620,9 @@ mod tests {
     #[test]
     fn day22_part2_test() {
         assert_eq!(part2_solve(EX), 5031);
+    }
+    #[test]
+    fn day22_part2_real() {
+        assert_eq!(part2_solve(REAL), 5031);
     }
 }
