@@ -48,6 +48,12 @@ impl Add<Point> for Point {
     }
 }
 
+impl ToString for Point {
+    fn to_string(&self) -> String {
+        format!("{},{}", self.0, self.1)
+    }
+}
+
 type Pos = (Point, Dir);
 
 #[derive(Debug)]
@@ -141,11 +147,6 @@ impl Map {
 
         // zip the seam back together
 
-        let mut dirs = [seam_start.1, seam_start.2];
-        let mut entdir = [seam_start.1, seam_start.2];
-        let mut points = [seam_start.0, seam_start.0];
-        let mut just_turned = [false, false];
-
         let cell = |x: usize, x_off: isize, y: usize, y_off: isize| -> &Cell {
             let Some(new_x) = x.checked_add_signed(x_off) else { 
                 return &Cell::Void;
@@ -187,11 +188,6 @@ impl Map {
 
             let voids = k.iter().flatten().filter(|&p| *p == &Cell::Void).count();
 
-            // println!();
-            // println!("kernel: {k:#?}", );
-            // println!("corners: {corners:#?}", );
-            // println!("found {voids} voids", );
-
             match voids {
                 // concave corner
                 1 => Some(corners.iter().find(|(p, _)| *p == &Cell::Void).unwrap().1),
@@ -203,13 +199,38 @@ impl Map {
         };
         // TODO resume here, test out corner()
 
-        let mut engine = ConsoleEngine::init(16, 13, 2).unwrap();
+        let zippers = || -> Vec<(Point, (Dir, Dir))> {
+            let mut points = vec![];
+            for y in 1..(grid.len()-1) {
+                for x in 1..(grid[0].len()-1) {
+                    let k = kernel(Point(x, y));
+                    if let Some(c) = corner(k) {
+                        points.push( (Point(x,y), c) );
+                    }
+                }
+            }
+            points
+        };
 
-        let mut print_grid = |i: i32, points: &[Point; 2],dirs: &[Dir; 2], net_portals: &HashMap<Point, Point>, engine: &mut ConsoleEngine| {
+        let start_points = zippers();
+
+        let mut dirs = [seam_start.1, seam_start.2];
+        let mut entdir = [seam_start.1, seam_start.2];
+        let mut points = [seam_start.0, seam_start.0];
+        let mut turning = [false, false];
+
+        let mut engine = ConsoleEngine::init(80, 18, 1).unwrap();
+
+        let print_grid = |i: i32, points: &[Point; 2],dirs: &[Dir; 2], net_portals: &HashMap<Point, Point>, engine: &mut ConsoleEngine| {
             engine.wait_frame();
             engine.clear_screen();
 
-            engine.print(0, 12, &format!("iteration {}", i));
+            engine.print(0, 13, &format!("iteration {}", i));
+            engine.print(0, 14, "O - portal");
+            engine.print(0, 15, "X - concave corner");
+            engine.print(0, 16, "<v^> - agent travel direction");
+            let starts: Vec<String> = start_points.iter().map(|p| format!("{} {} {}", p.0.to_string(), p.1.0.to_string(), p.1.1.to_string())).collect();
+            engine.print(0, 17, &format!("{}", starts.join(" / ")));
 
             for (y, row) in grid.iter().enumerate() {
                 for (x, cell) in row.iter().enumerate() {
@@ -219,96 +240,80 @@ impl Map {
                     if let Some(portal) = net_portals.get(&p) {
                         engine.print(x, y, "O");
                         // print!("O");
+                    } else if start_points.iter().find(|c| c.0 == p).is_some() {
+                        engine.print(x, y, "X");
                     } else if points[0] == p {
                         engine.print(x, y, dirs[0].into());
-                        // print!("{}", char::from(dirs[0]));
                     } else if points[1] == p {
                         engine.print(x, y, dirs[1].into());
-                        // print!("{}", char::from(dirs[1]));
                     } else {
                         engine.print(x, y, cell.into());
-                        // print!("{}", char::from(cell));
                     }
                 }
-                // println!();
             }
 
             engine.draw();
         };
 
         let mut i = 0;
-        loop {
-            // turning occupies one iteration, since the corner is attached to two other points
-            i += 1;
+        for start in &start_points {
+            let mut ii = 0;
 
-            if engine.is_key_pressed(KeyCode::Char('q')) {
-                break;
-            }
+            dirs = [start.1.0, start.1.1];
+            entdir = [seam_start.1, seam_start.2];
+            points = [start.0 + dirs[0], start.0 + dirs[1]];
+            turning = [false, false];
 
-            // println!("##############################");
-            // println!("Step {i}");
-            // println!("a @ {:?} b@ {:?}", points[0], points[1]);
+            loop {
+                // turning occupies one iteration, since the corner is attached to two other points
+                i += 1;
+                ii += 1;
 
-            // check for a turn
-            let kernels: [Kernel; 2] = points.map(kernel);
-
-            let corners: [Option<(Dir, Dir)>; 2] = kernels.map(corner);
-
-            // println!("{:#?}", corners);
-
-            // TODO if _both_ points turn at the same time, this algorithm needs to be restarted at
-            // another one of the starting nooks
-
-            // either turn or move
-            if just_turned[0] {
-                just_turned[0] = false;
-            } else {
-                if let Some(corner) = corners[0] {
-                    dirs[0] = match dirs[0] {
-                        Up => corner.0,
-                        Right => corner.1,
-                        Down => corner.0,
-                        Left => corner.1,
-                    };
-                    just_turned[0] = true;
-                    // println!("a turns {:?}", dirs[0]);
+                if engine.is_key_pressed(KeyCode::Char('q')) {
+                    break;
                 }
-            }
-            if just_turned[1] {
-                just_turned[1] = false;
-            } else {
-                if let Some(corner) = corners[1] {
-                    dirs[1] = match dirs[1] {
-                        Up => corner.0,
-                        Right => corner.1,
-                        Down => corner.0,
-                        Left => corner.1,
-                    };
-                    just_turned[1] = true;
-                    // println!("b turns {:?}", dirs[1]);
+
+
+                // check for a turn
+                let kernels: [Kernel; 2] = points.map(kernel);
+
+                let corners: [Option<(Dir, Dir)>; 2] = kernels.map(corner);
+
+                // TODO if _both_ points turn at the same time, this algorithm needs to be restarted at
+                // another one of the starting nooks
+
+                print_grid(i, &points, &dirs, &net_portals, &mut engine);
+
+                net_portals.insert(points[0], points[1]);
+                net_portals.insert(points[1], points[0]);
+
+                // either turn or move
+                for i in 0..=1 {
+                    if turning[i] {
+                        turning[i] = false;
+                    } else {
+                        if let Some(corner) = corners[i] {
+                            dirs[i] = match dirs[i] {
+                                Up => corner.0,
+                                Right => corner.1,
+                                Down => corner.0,
+                                Left => corner.1,
+                            };
+                            turning[i] = true;
+                        }
+                        points[i] = points[i] + dirs[i];
+                    }
                 }
-            }
-            if !just_turned[0] {
-                points[0] = points[0] + dirs[0];
-                // println!("a goes {:?} to {:?}", dirs[0], points[0]);
-            }
-            if !just_turned[1] {
-                points[1] = points[1] + dirs[1];
-                // println!("a goes {:?} to {:?}", dirs[1], points[1]);
-            }
 
-            print_grid(i, &points, &dirs, &net_portals, &mut engine);
+                if turning[0] && turning[1] {
+                    break;
+                }
 
-            if i > 1 && points[0] == points[1] {
-                // reached the end of the seam
-                break;
-            }
+                if ii > 1 && points[0] == points[1] {
+                    // reached the end of the seam
+                    break;
+                }
 
-            net_portals.insert(points[0], points[1]);
-            net_portals.insert(points[1], points[0]);
-
-            if i > 30 {
-                break;
             }
         }
 
@@ -335,11 +340,8 @@ impl Map {
 
         let mut cur = *cur;
         for _i in 1..=step.1 {
-            // println!("  take step {i} of {} to the {:?}", step.1, step.0);
             cur = self.next_point(&cur, &step.0);
         }
-
-        // println!(" end {cur:?}");
 
         cur
     }
@@ -436,6 +438,17 @@ impl From<Dir> for &str {
     }
 }
 
+impl ToString for Dir {
+    fn to_string(&self) -> String {
+        match self {
+            Dir::Up => "^",
+            Dir::Right => ">",
+            Dir::Down => "v",
+            Dir::Left => "<",
+        }.to_string()
+    }
+}
+
 impl Dir {
     fn turn(&self, lr: char) -> Self {
         if lr == 'L' {
@@ -510,20 +523,12 @@ fn part1_solve(input: &str) -> usize {
     let map = Map::new(parts.next().unwrap());
     let steps = Steps::new(parts.next().unwrap());
 
-    // println!("{map:#?}",);
-    // println!("{steps:?}",);
     let (mut pos, mut dir) = map.start_pos();
-    // println!("start: {pos:?}");
 
     for step in &steps.0 {
         pos = map.step(&pos, step);
         dir = step.0;
     }
-
-    // println!("Final pos: {pos:?}",);
-    // println!("Final dir: {dir:?}",);
-
-    // println!("{}", steps.0.len());
 
     1000 * (pos.1 + 1) + 4 * (pos.0 + 1) + dir.score()
 }
