@@ -219,7 +219,7 @@ impl Map {
         let mut points = [seam_start.0, seam_start.0];
         let mut turning = [false, false];
 
-        let mut engine = ConsoleEngine::init(80, 18, 1).unwrap();
+        let mut engine = ConsoleEngine::init(80, 18, 4).unwrap();
 
         let print_grid = |i: i32, points: &[Point; 2],dirs: &[Dir; 2], net_portals: &HashMap<Point, Point>, engine: &mut ConsoleEngine| {
             engine.wait_frame();
