@@ -10,7 +10,7 @@ use nom::{
 };
 use std::{collections::HashMap, ops::Add};
 
-type Step = (Dir, i32);
+type Step = (Dir, char, i32);
 
 #[derive(Debug)]
 struct Steps(Vec<Step>);
@@ -23,7 +23,7 @@ impl Steps {
                 pair(one_of("LR"), complete::i32),
                 |pair: (char, i32)| {
                     dir = dir.turn(pair.0);
-                    (dir, pair.1)
+                    (dir, pair.0, pair.1)
                 },
             )))(moves);
             steps
@@ -357,22 +357,24 @@ impl Map {
         // print!("walk {step:?} start {cur:?}",);
 
         let mut cur = *cur;
-        for _i in 1..=step.1 {
+        for _i in 1..=step.2 {
             cur = self.next_point(&cur, &step.0);
         }
 
         cur
     }
 
-    fn step2(&self, cur: &Point, step: &Step) -> Point {
+    fn step2(&self, cur: &Point, step: &Step) -> (Point, Dir) {
         // print!("walk {step:?} start {cur:?}",);
 
+        let mut dir = step.0;
         let mut cur = *cur;
-        for _i in 1..=step.1 {
-            cur = self.next_point2(&cur, &step.0);
+        for _i in 1..=step.2 {
+            (cur, dir) = self.next_point2(&cur, &step.0);
+            dir.turn(step.1);
         }
 
-        cur
+        (cur, dir)
     }
 
     fn next_point(&self, cur: &Point, dir: &Dir) -> Point {
@@ -440,7 +442,7 @@ impl Map {
         }
     }
 
-    fn next_point2(&self, cur: &Point, dir: &Dir) -> Point {
+    fn next_point2(&self, cur: &Point, dir: &Dir) -> (Point, Dir) {
         let next =  match dir {
             Dir::Up => Point(cur.0, (self.grid.len() + cur.1 - 1) % self.grid.len()),
             Dir::Right => Point((cur.0 + 1) % self.grid[0].len(), cur.1),
@@ -449,17 +451,25 @@ impl Map {
         };
 
         match self.grid[next.1][next.0] {
-            Cell::Open => next,
-            Cell::Wall => *cur,
+            Cell::Open => {
+                println!("walked {:?} from {:?}", dir, cur);
+                (next, *dir)
+            }
+            Cell::Wall => {
+                println!("walked {:?} from {:?} but hit a wall; staying put", dir, cur);
+                (*cur, *dir)
+        }
             Cell::Void => {
                 let Some(p) = self.net_portals.get(&(*cur, *dir)) else {
                     println!("{:?}", self.net_portals);
                     panic!("tried to go {:?} from {:?} into Void and found no portal", dir, cur);
                 };
                 if self.grid[p.0.1][p.0.0] == Cell::Open {
-                    p.0
+                    println!("portaled {:?} from {:?} to {:?}", dir, cur, p.0);
+                    *p
                 } else {
-                    *cur
+                    println!("portaled {:?} from {:?} but hit a wall at {:?}; staying put", dir, cur, p.0);
+                    (*cur, *dir)
                 }
             }
         }
@@ -642,8 +652,7 @@ fn part2_solve(input: &str) -> usize {
     let (mut pos, mut dir) = map.start_pos();
 
     for step in &steps.0 {
-        pos = map.step2(&pos, step);
-        dir = step.0;
+        (pos, dir) = map.step2(&pos, step);
     }
 
     1000 * (pos.1 + 1) + 4 * (pos.0 + 1) + dir.score()
