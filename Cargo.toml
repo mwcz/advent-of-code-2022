@@ -24,3 +24,6 @@ serde_json = "1.0.89"
 # lto = true    
 # strip = true  
 # panic = "abort" 
+
+[features]
+visualize = []

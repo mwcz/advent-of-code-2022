@@ -62,7 +62,8 @@ struct Map {
     /// The min and max bounds where non-void cells lie.  Used for wrapping around when stepping
     /// into the void.  (row_bounds, col_bounds)
     bounds: (Vec<Point>, Vec<Point>),
-    net_portals: HashMap<Point, Point>,
+    /// if you enter void from key point going dir, teleport to value point facing dir
+    net_portals: HashMap<(Point, Dir), (Point, Dir)>,
 }
 
 impl Map {
@@ -118,11 +119,6 @@ impl Map {
         }
 
         use Dir::*;
-        // Find a concave right angle in the net, to be a starting point for zipping the cube back
-        // together.  Returns the point where the nook is and the directions of each line coming out
-        // of it.
-        // TODO find this dynamically
-        let seam_start = (Point(8, 4), Dir::Left, Dir::Up); // for the example
 
         // let seam_start = (Point(50, 100), Dir::Left, Dir::Up); // for the real input
 
@@ -197,8 +193,8 @@ impl Map {
                 _ => None,
             }
         };
-        // TODO resume here, test out corner()
 
+        // Find all the concave right angles in the cube net.
         let zippers = || -> Vec<(Point, (Dir, Dir))> {
             let mut points = vec![];
             for y in 1..(grid.len()-1) {
@@ -212,18 +208,24 @@ impl Map {
             points
         };
 
+        // use each concave right angle as a starting point
         let start_points = zippers();
 
         let mut dirs;
         let mut points;
+        let mut entdirs;
+        let mut exdirs;
         let mut turning;
 
         let width: u32 = (map_str.lines().next().unwrap().len() + 4).try_into().unwrap();
         let height: u32 = (map_str.lines().collect_vec().len() + 5).try_into().unwrap();
         let fps: u32 = 5;
+
+        #[cfg(feature = "visualize")]
         let mut engine = ConsoleEngine::init(width, height, fps).unwrap();
 
-        let print_grid = |i: i32, points: &[Point; 2],dirs: &[Dir; 2], net_portals: &HashMap<Point, Point>, engine: &mut ConsoleEngine| {
+        #[cfg(feature = "visualize")]
+        let print_grid = |i: i32, points: &[Point; 2],dirs: &[Dir; 2], net_portals: &HashMap<(Point, Dir), (Point, Dir)>, engine: &mut ConsoleEngine| {
             engine.wait_frame();
             engine.clear_screen();
 
@@ -232,14 +234,15 @@ impl Map {
             engine.print(0, (height as i32)-2, "X - concave corner");
             engine.print(0, (height as i32)-1, "<v^> - agent travel direction");
             let starts: Vec<String> = start_points.iter().map(|p| format!("{} {} {}", p.0.to_string(), p.1.0.to_string(), p.1.1.to_string())).collect();
-            engine.print(0, (height as i32), &format!("{}", starts.join(" / ")));
+            engine.print(0, height as i32, &format!("{}", starts.join(" / ")));
 
             for (y, row) in grid.iter().enumerate() {
                 for (x, cell) in row.iter().enumerate() {
                     let p = Point(x, y);
                     let x = x as i32;
                     let y = y as i32;
-                    if let Some(portal) = net_portals.get(&p) {
+
+                    if net_portals.keys().find(|k| k.0 == p).is_some() {
                         engine.print(x, y, "█");
                         // print!("O");
                     } else if start_points.iter().find(|c| c.0 == p).is_some() {
@@ -262,6 +265,8 @@ impl Map {
             let mut ii = 0;
 
             dirs = [start.1.0, start.1.1];
+            entdirs = [start.1.1.flip(), start.1.0.flip()];
+            exdirs = [start.1.1, start.1.0];
             points = [start.0 + dirs[0], start.0 + dirs[1]];
             turning = [false, false];
 
@@ -270,39 +275,51 @@ impl Map {
                 i += 1;
                 ii += 1;
 
+                #[cfg(feature = "visualize")]
                 if engine.is_key_pressed(KeyCode::Char('q')) {
                     break;
                 }
 
+                // if we reached an already-cached state, we're done
+                if net_portals.contains_key(&(points[0], exdirs[0])) && net_portals.contains_key(&(points[1], exdirs[1])) {
+                    break;
+                }
 
                 // check for a turn
                 let kernels: [Kernel; 2] = points.map(kernel);
 
                 let corners: [Option<(Dir, Dir)>; 2] = kernels.map(corner);
 
-                // TODO if _both_ points turn at the same time, this algorithm needs to be restarted at
-                // another one of the starting nooks
-
+                #[cfg(feature = "visualize")]
                 print_grid(i, &points, &dirs, &net_portals, &mut engine);
 
-                net_portals.insert(points[0], points[1]);
-                net_portals.insert(points[1], points[0]);
+                net_portals.insert((points[0], exdirs[0]), (points[1], entdirs[1]));
+                net_portals.insert((points[1], exdirs[1]), (points[0], entdirs[0]));
 
                 // either turn or move
-                for i in 0..=1 {
-                    if turning[i] {
-                        turning[i] = false;
+                for agent_idx in 0..=1 {
+                    if turning[agent_idx] {
+                        turning[agent_idx] = false;
                     } else {
-                        if let Some(corner) = corners[i] {
-                            dirs[i] = match dirs[i] {
+                        if let Some(corner) = corners[agent_idx] {
+                            let new_dir = match dirs[agent_idx] {
                                 Up => corner.0,
                                 Right => corner.1,
                                 Down => corner.0,
                                 Left => corner.1,
                             };
-                            turning[i] = true;
+                            let rot_dir: Rot = Rot::try_from((dirs[agent_idx], new_dir)).unwrap();
+                            dirs[agent_idx] = new_dir;
+                            entdirs[agent_idx] = entdirs[agent_idx].rot(rot_dir);
+                            exdirs[agent_idx] = exdirs[agent_idx].rot(rot_dir);
+                            turning[agent_idx] = true;
+
+                            // each corner gets two portals, one for each direction, so record the
+                            // second portal now
+                            net_portals.insert((points[agent_idx], exdirs[agent_idx]), (points[(agent_idx + 1) % 2], entdirs[(agent_idx + 1) % 2]));
                         }
-                        points[i] = points[i] + dirs[i];
+                        // only move if not turning
+                        points[agent_idx] = points[agent_idx] + dirs[agent_idx];
                     }
                 }
 
@@ -342,6 +359,17 @@ impl Map {
         let mut cur = *cur;
         for _i in 1..=step.1 {
             cur = self.next_point(&cur, &step.0);
+        }
+
+        cur
+    }
+
+    fn step2(&self, cur: &Point, step: &Step) -> Point {
+        // print!("walk {step:?} start {cur:?}",);
+
+        let mut cur = *cur;
+        for _i in 1..=step.1 {
+            cur = self.next_point2(&cur, &step.0);
         }
 
         cur
@@ -411,6 +439,31 @@ impl Map {
             }
         }
     }
+
+    fn next_point2(&self, cur: &Point, dir: &Dir) -> Point {
+        let next =  match dir {
+            Dir::Up => Point(cur.0, (self.grid.len() + cur.1 - 1) % self.grid.len()),
+            Dir::Right => Point((cur.0 + 1) % self.grid[0].len(), cur.1),
+            Dir::Down => Point(cur.0, (cur.1 + 1) % self.grid.len()),
+            Dir::Left => Point((self.grid[0].len() + cur.0 - 1) % self.grid[0].len(), cur.1),
+        };
+
+        match self.grid[next.1][next.0] {
+            Cell::Open => next,
+            Cell::Wall => *cur,
+            Cell::Void => {
+                let Some(p) = self.net_portals.get(&(*cur, *dir)) else {
+                    println!("{:?}", self.net_portals);
+                    panic!("tried to go {:?} from {:?} into Void and found no portal", dir, cur);
+                };
+                if self.grid[p.0.1][p.0.0] == Cell::Open {
+                    p.0
+                } else {
+                    *cur
+                }
+            }
+        }
+    }
 }
 
 #[derive(Debug, PartialEq, Eq)]
@@ -420,7 +473,7 @@ enum Cell {
     Void,
 }
 
-#[derive(Debug, PartialEq, Eq, Clone, Copy)]
+#[derive(Debug, PartialEq, Eq, Clone, Copy, Hash)]
 enum Dir {
     Up,
     Right,
@@ -482,7 +535,48 @@ impl Dir {
             Dir::Left => Dir::Down,
         }
     }
+    fn flip(&self) -> Self {
+        match self {
+            Dir::Up => Dir::Down,
+            Dir::Right => Dir::Left,
+            Dir::Down => Dir::Up,
+            Dir::Left => Dir::Right,
+        }
+    }
+    fn rot(&self, rot: Rot) -> Self {
+        match rot {
+            Rot::Cw => self.cw(),
+            Rot::Ccw => self.ccw(),
+        }
+    }
 }
+
+#[derive(Debug, PartialEq, Eq, Clone, Copy)]
+enum Rot {
+    Cw,
+    Ccw
+}
+
+impl TryFrom<(Dir, Dir)> for Rot {
+    type Error = ();
+
+    fn try_from(value: (Dir, Dir)) -> Result<Self, Self::Error> {
+        use Dir::*;
+        use Rot::*;
+        match value {
+            (Up, Right) => Ok(Cw),
+            (Up, Left) => Ok(Ccw),
+            (Right, Up) => Ok(Ccw),
+            (Right, Down) => Ok(Cw),
+            (Down, Right) => Ok(Ccw),
+            (Down, Left) => Ok(Cw),
+            (Left, Up) => Ok(Cw),
+            (Left, Down) => Ok(Ccw),
+            _ => Err(())
+        }
+    }
+}
+
 
 impl Add<Dir> for Point {
     type Output = Point;
@@ -548,7 +642,7 @@ fn part2_solve(input: &str) -> usize {
     let (mut pos, mut dir) = map.start_pos();
 
     for step in &steps.0 {
-        pos = map.step(&pos, step);
+        pos = map.step2(&pos, step);
         dir = step.0;
     }
 
