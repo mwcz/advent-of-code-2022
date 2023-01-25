@@ -12,6 +12,17 @@ struct Elf {
     proposal: Option<Point>,
 }
 
+struct Scan {
+    n: Point,
+    ne: Point,
+    e: Point,
+    se: Point,
+    s: Point,
+    sw: Point,
+    w: Point,
+    nw: Point,
+}
+
 struct Grove {
     grid: VecDeque<VecDeque<Cell>>,
     elf_count: usize,
@@ -25,6 +36,20 @@ impl Grove {
             })
         });
         Self { grid, elf_count }
+    }
+
+    fn scan(&self, loc: &Point) -> Scan {
+        let n = Point(loc.0, loc.1 - 1);
+        let ne = Point(loc.0 + 1, loc.1 - 1);
+        let e = Point(loc.0 + 1, loc.1);
+        let se = Point(loc.0 + 1, loc.1 + 1);
+        let s = Point(loc.0, loc.1 + 1);
+        let sw = Point(loc.0 - 1, loc.1 + 1);
+        let w = Point(loc.0 - 1, loc.1);
+        let nw = Point(loc.0 - 1, loc.1 - 1);
+
+        // TODO resume here: consider using a HashMap<(x,y), Cell> instead of VecDeque<VecDeque<Cell>>
+        // it would have no cost of expanding the area
     }
 }
 
