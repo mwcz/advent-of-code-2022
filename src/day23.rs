@@ -1,14 +1,11 @@
-use std::collections::VecDeque;
-
 use aoc_runner_derive::aoc;
-use itertools::Itertools;
+use std::{collections::HashMap, fmt::Display};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 struct Point(i32, i32);
 
 #[derive(PartialEq, Eq)]
 struct Elf {
-    loc: Point,
     proposal: Option<Point>,
 }
 
@@ -23,19 +20,19 @@ struct Scan {
     nw: Point,
 }
 
+struct BoundingBox {
+    width: i32,
+    height: i32,
+    origin: Point,
+}
+
 struct Grove {
-    grid: VecDeque<VecDeque<Cell>>,
-    elf_count: usize,
+    grid: HashMap<Point, Elf>,
 }
 
 impl Grove {
-    fn new(grid: VecDeque<VecDeque<Cell>>) -> Self {
-        let elf_count = grid.iter().fold(0, |acc, row| {
-            acc + row.iter().fold(0, |row_acc, cell| {
-                row_acc + cell.value()
-            })
-        });
-        Self { grid, elf_count }
+    fn new(grid: HashMap<Point, Elf>) -> Self {
+        Self { grid }
     }
 
     fn scan(&self, loc: &Point) -> Scan {
@@ -50,29 +47,25 @@ impl Grove {
 
         // TODO resume here: consider using a HashMap<(x,y), Cell> instead of VecDeque<VecDeque<Cell>>
         // it would have no cost of expanding the area
+        todo!();
     }
-}
 
-#[derive(PartialEq, Eq)]
-enum Cell {
-    Elf(Elf),
-    Empty,
-}
-
-impl Cell {
-    fn value(&self) -> usize {
-        match self {
-            Cell::Elf(_) => 1,
-            Cell::Empty => 0,
+    fn bounding_box(&self) -> BoundingBox {
+        let mut minx = i32::MAX;
+        let mut maxx = i32::MIN;
+        let mut miny = i32::MAX;
+        let mut maxy = i32::MIN;
+        for point in self.grid.keys() {
+            minx = minx.min(point.0);
+            maxx = maxx.max(point.0);
+            miny = miny.min(point.1);
+            maxy = maxy.max(point.1);
         }
-    }
-}
 
-impl From<&Cell> for char {
-    fn from(val: &Cell) -> Self {
-        match val {
-            Cell::Elf(_) => '#',
-            Cell::Empty => '.',
+        BoundingBox {
+            width: maxx - minx,
+            height: maxy - miny,
+            origin: Point(minx, miny),
         }
     }
 }
@@ -89,13 +82,21 @@ impl Iterator for Grove {
     }
 }
 
-impl ToString for Grove {
-    fn to_string(&self) -> String {
-        self.grid
-            .iter()
-            .map(|row| row.iter().map(|cell| char::from(cell)).collect::<String>())
-            .collect_vec()
-            .join("\n")
+impl Display for Grove {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let bounds = self.bounding_box();
+        for y in 0..=bounds.height {
+            for x in 0..=bounds.width {
+                let cell = self.grid.get(&Point(x, y));
+                let symbol = match cell {
+                    Some(_) => '#',
+                    None => '.',
+                };
+                write!(f, "{}", symbol)?;
+            }
+            writeln!(f)?;
+        }
+        Ok(())
     }
 }
 
@@ -104,31 +105,25 @@ fn part1_solve(input: &str) -> usize {
         .lines()
         .enumerate()
         .map(|(y, line)| {
-            line.chars()
-                .enumerate()
-                // .filter(|(_, c)| c == &'#')
-                .map(move |(x, c)| {
-                    if c == '#' {
-                        Cell::Elf(Elf {
-                            loc: Point(x as i32, y as i32),
-                            proposal: None,
-                        })
-                    } else {
-                        Cell::Empty
-                    }
-                })
-                .collect::<VecDeque<Cell>>()
+            line.chars().enumerate().filter_map(move |(x, c)| {
+                if c == '#' {
+                    Some((Point(x as i32, y as i32), Elf { proposal: None }))
+                } else {
+                    None
+                }
+            })
         })
-        .collect::<VecDeque<VecDeque<Cell>>>();
+        .flatten()
+        .collect::<HashMap<Point, Elf>>();
 
     let mut grove = Grove::new(grid);
 
-    println!("{}", grove.to_string());
-    println!("elves: {}", grove.elf_count);
+    println!("{}", grove);
 
-    let area = grove.grid.len() * grove.grid[0].len();
+    // let area = grove.grid.len() * grove.grid[0].len();
 
-    (area as usize) - grove.elf_count
+    // (area as usize) - grove.elf_count
+    todo!();
 }
 
 #[aoc(day23, part1)]
