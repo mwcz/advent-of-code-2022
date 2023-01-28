@@ -9,15 +9,40 @@ struct Elf {
     proposal: Option<Point>,
 }
 
-struct Scan {
-    n: Point,
-    ne: Point,
-    e: Point,
-    se: Point,
-    s: Point,
-    sw: Point,
-    w: Point,
-    nw: Point,
+struct Survey<'elf> {
+    n: Option<&'elf Elf>,
+    ne: Option<&'elf Elf>,
+    e: Option<&'elf Elf>,
+    se: Option<&'elf Elf>,
+    s: Option<&'elf Elf>,
+    sw: Option<&'elf Elf>,
+    w: Option<&'elf Elf>,
+    nw: Option<&'elf Elf>,
+}
+
+impl<'elf> Survey<'elf> {
+    fn is_empty(&self) -> bool {
+        self.n.is_none()
+            && self.ne.is_none()
+            && self.e.is_none()
+            && self.se.is_none()
+            && self.s.is_none()
+            && self.sw.is_none()
+            && self.w.is_none()
+            && self.nw.is_none()
+    }
+    fn is_empty_north(&self) -> bool {
+        self.n.is_none() && self.ne.is_none() && self.nw.is_none()
+    }
+    fn is_empty_south(&self) -> bool {
+        self.s.is_none() && self.se.is_none() && self.sw.is_none()
+    }
+    fn is_empty_east(&self) -> bool {
+        self.e.is_none() && self.se.is_none() && self.ne.is_none()
+    }
+    fn is_empty_west(&self) -> bool {
+        self.nw.is_none() && self.w.is_none() && self.sw.is_none()
+    }
 }
 
 struct BoundingBox {
@@ -35,7 +60,7 @@ impl Grove {
         Self { grid }
     }
 
-    fn scan(&self, loc: &Point) -> Scan {
+    fn survey(&self, loc: &Point) -> Survey {
         let n = Point(loc.0, loc.1 - 1);
         let ne = Point(loc.0 + 1, loc.1 - 1);
         let e = Point(loc.0 + 1, loc.1);
@@ -45,9 +70,16 @@ impl Grove {
         let w = Point(loc.0 - 1, loc.1);
         let nw = Point(loc.0 - 1, loc.1 - 1);
 
-        // TODO resume here: consider using a HashMap<(x,y), Cell> instead of VecDeque<VecDeque<Cell>>
-        // it would have no cost of expanding the area
-        todo!();
+        Survey {
+            n: self.grid.get(&n),
+            ne: self.grid.get(&ne),
+            e: self.grid.get(&e),
+            se: self.grid.get(&se),
+            s: self.grid.get(&s),
+            sw: self.grid.get(&sw),
+            w: self.grid.get(&w),
+            nw: self.grid.get(&nw),
+        }
     }
 
     fn bounding_box(&self) -> BoundingBox {
@@ -74,7 +106,28 @@ impl Iterator for Grove {
     type Item = ();
 
     fn next(&mut self) -> Option<Self::Item> {
+        let mut moves = vec![];
         // first half
+        for (point, elf) in self.grid.iter() {
+            let survey = self.survey(point);
+            if !survey.is_empty() {
+                if survey.is_empty_north() {
+                    moves.push((point, Point(point.0, point.1 - 1)));
+                }
+                if survey.is_empty_south() {
+                    moves.push((point, Point(point.0, point.1 + 1)));
+                }
+                if survey.is_empty_east() {
+                    moves.push((point, Point(point.0 + 1, point.1)));
+                }
+                if survey.is_empty_north() {
+                    moves.push((point, Point(point.0 - 1, point.1)));
+                }
+            }
+        }
+
+        // TODO resume here: remove duplicate entries in the moves vec.  not just dedup, remove
+        // _all_ occurrences of dupes, ie 1,2,2,3 becomes 1,3
 
         // second half
 
