@@ -1,8 +1,25 @@
 use aoc_runner_derive::aoc;
-use std::{collections::HashMap, fmt::Display};
+use console_engine::{ConsoleEngine, KeyCode};
+use derive_more::{Add, AddAssign, Sub, SubAssign};
+use std::{array::IntoIter, collections::HashMap, fmt::Display, iter::Cycle};
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Add, AddAssign, Sub, SubAssign)]
 struct Point(i32, i32);
+
+impl Point {
+    fn north() -> Self {
+        Point(0, -1)
+    }
+    fn south() -> Self {
+        Point(0, 1)
+    }
+    fn east() -> Self {
+        Point(1, 0)
+    }
+    fn west() -> Self {
+        Point(-1, 0)
+    }
+}
 
 #[derive(PartialEq, Eq)]
 struct Elf {
@@ -31,6 +48,16 @@ impl<'elf> Survey<'elf> {
             && self.w.is_none()
             && self.nw.is_none()
     }
+    /// Is the cardinal direction empty?  ie, given north, is the space nw, n, and ne empty.
+    fn is_empty_in_dir(&self, dir: char) -> bool {
+        match dir {
+            'n' => self.is_empty_north(),
+            's' => self.is_empty_south(),
+            'e' => self.is_empty_east(),
+            'w' => self.is_empty_west(),
+            _ => panic!("invalid dir '{dir}' passed to is_empty_in_dir"),
+        }
+    }
     fn is_empty_north(&self) -> bool {
         self.n.is_none() && self.ne.is_none() && self.nw.is_none()
     }
@@ -53,22 +80,33 @@ struct BoundingBox {
 
 struct Grove {
     grid: HashMap<Point, Elf>,
+    directions: Cycle<IntoIter<(char, Point), 4>>,
 }
 
 impl Grove {
     fn new(grid: HashMap<Point, Elf>) -> Self {
-        Self { grid }
+        Self {
+            grid,
+            directions: [
+                ('n', Point::north()),
+                ('s', Point::south()),
+                ('w', Point::west()),
+                ('e', Point::east()),
+            ]
+            .into_iter()
+            .cycle(),
+        }
     }
 
-    fn survey(&self, loc: &Point) -> Survey {
-        let n = Point(loc.0, loc.1 - 1);
-        let ne = Point(loc.0 + 1, loc.1 - 1);
-        let e = Point(loc.0 + 1, loc.1);
-        let se = Point(loc.0 + 1, loc.1 + 1);
-        let s = Point(loc.0, loc.1 + 1);
-        let sw = Point(loc.0 - 1, loc.1 + 1);
-        let w = Point(loc.0 - 1, loc.1);
-        let nw = Point(loc.0 - 1, loc.1 - 1);
+    fn survey(&self, loc: Point) -> Survey {
+        let n = loc + Point::north();
+        let ne = loc + Point::north() + Point::east();
+        let e = loc + Point::east();
+        let se = loc + Point::south() + Point::east();
+        let s = loc + Point::south();
+        let sw = loc + Point::south() + Point::west();
+        let w = loc + Point::west();
+        let nw = loc + Point::north() + Point::west();
 
         Survey {
             n: self.grid.get(&n),
@@ -87,6 +125,7 @@ impl Grove {
         let mut maxx = i32::MIN;
         let mut miny = i32::MAX;
         let mut maxy = i32::MIN;
+
         for point in self.grid.keys() {
             minx = minx.min(point.0);
             maxx = maxx.max(point.0);
@@ -95,8 +134,8 @@ impl Grove {
         }
 
         BoundingBox {
-            width: maxx - minx,
-            height: maxy - miny,
+            width: maxx - minx + 1,
+            height: maxy - miny + 1,
             origin: Point(minx, miny),
         }
     }
@@ -108,37 +147,25 @@ struct Move {
 }
 
 impl Iterator for Grove {
-    type Item = ();
+    type Item = bool;
 
     fn next(&mut self) -> Option<Self::Item> {
+        let mut elf_moved = false;
         let mut moves = vec![];
         // first half
-        for (point, elf) in self.grid.iter() {
-            let survey = self.survey(point);
+        for (point, _) in self.grid.iter() {
+            let mut dirs = self.directions.clone();
+            let survey = self.survey(*point);
             if !survey.is_empty() {
-                if survey.is_empty_north() {
-                    moves.push(Move {
-                        from: *point,
-                        to: Point(point.0, point.1 - 1),
-                    });
-                }
-                if survey.is_empty_south() {
-                    moves.push(Move {
-                        from: *point,
-                        to: Point(point.0, point.1 + 1),
-                    });
-                }
-                if survey.is_empty_east() {
-                    moves.push(Move {
-                        from: *point,
-                        to: Point(point.0 + 1, point.1),
-                    });
-                }
-                if survey.is_empty_north() {
-                    moves.push(Move {
-                        from: *point,
-                        to: Point(point.0 - 1, point.1),
-                    });
+                for _ in 0..4 {
+                    let (dirname, dir) = dirs.next().unwrap();
+                    if survey.is_empty_in_dir(dirname) {
+                        moves.push(Move {
+                            from: *point,
+                            to: *point + dir,
+                        });
+                        break; // done with this elf
+                    }
                 }
             }
         }
@@ -150,23 +177,24 @@ impl Iterator for Grove {
             *count += 1;
         }
 
-        // filter out any moves that appeared more than once
-        histo = histo.drain_filter(|k, v| *v == 1).collect();
-
+        // second half
         // apply the remaining moves
         for mov in &moves {
             // if the move occurred only once
-            if histo.contains_key(&mov.to) {
+            let mov_count = histo.get(&mov.to);
+            if let Some(1) = mov_count {
                 // remove the elf at mov.from from self.grid and reinsert it at mov.to
                 if let Some(elf) = self.grid.remove(&mov.from) {
                     self.grid.insert(mov.to, elf);
+                    elf_moved = true;
                 }
             }
         }
 
-        // second half
+        // cycle away the first direction considered this round
+        self.directions.next();
 
-        Some(())
+        Some(elf_moved)
     }
 }
 
@@ -174,14 +202,14 @@ impl Display for Grove {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         const PAD: i32 = 3;
         let bounds = self.bounding_box();
-        for y in -PAD..=(bounds.height+PAD) {
-            for x in -PAD..=(bounds.width+PAD) {
+        for y in (bounds.origin.1 - PAD)..=(bounds.origin.1 + bounds.height + PAD) {
+            for x in (bounds.origin.0 - PAD)..=(bounds.origin.0 + bounds.width + PAD) {
                 let cell = self.grid.get(&Point(x, y));
                 let symbol = match cell {
                     Some(_) => '#',
                     None => '.',
                 };
-                write!(f, "{}", symbol)?;
+                write!(f, "{symbol}")?;
             }
             writeln!(f)?;
         }
@@ -189,11 +217,11 @@ impl Display for Grove {
     }
 }
 
-fn part1_solve(input: &str) -> usize {
-    let mut grid = input
+fn parse(input: &str) -> Grove {
+    let grid = input
         .lines()
         .enumerate()
-        .map(|(y, line)| {
+        .flat_map(|(y, line)| {
             line.chars().enumerate().filter_map(move |(x, c)| {
                 if c == '#' {
                     Some((Point(x as i32, y as i32), Elf { proposal: None }))
@@ -202,26 +230,72 @@ fn part1_solve(input: &str) -> usize {
                 }
             })
         })
-        .flatten()
         .collect::<HashMap<Point, Elf>>();
 
-    let mut grove = Grove::new(grid);
+    Grove::new(grid)
+}
 
-    println!("{}", grove);
-    grove.next();
+fn part1_solve(input: &str, rounds: usize) -> i32 {
+    let mut grove = parse(input);
 
-    println!("{}", grove);
-    grove.next();
+    grove.nth(rounds - 1); // offset 1 to account for initial state
 
     // let area = grove.grid.len() * grove.grid[0].len();
+    let bounds = grove.bounding_box();
+    let area = bounds.width * bounds.height;
+    let elf_count = grove.grid.len() as i32;
 
-    // (area as usize) - grove.elf_count
-    todo!();
+    area - elf_count
 }
 
 #[aoc(day23, part1)]
-fn part1_solver(input: &str) -> usize {
-    part1_solve(input)
+fn part1_solver(input: &str) -> i32 {
+    part1_solve(input, 10)
+}
+
+fn part2_solve(input: &str) -> i32 {
+    let mut grove = parse(input);
+
+    // let (rounds, _) = grove.into_iter().enumerate().find(|(_, p)| !p).unwrap();
+    // rounds + 1
+
+    let width = 140;
+    let height = 140;
+    let fps = 250;
+    #[cfg(feature = "visualize")]
+    let mut engine = ConsoleEngine::init(width, height, fps).unwrap();
+
+    #[cfg(feature = "visualize")]
+    let print_grid = |round: i32, grove: &Grove, engine: &mut ConsoleEngine| {
+        engine.wait_frame();
+        engine.clear_screen();
+
+        engine.print(0, 0, &format!("Round {}", round));
+        engine.print(0, 2, &format!("{grove}"));
+
+        engine.draw();
+    };
+
+    let mut rounds = 1;
+    while let Some(true) = grove.next() {
+        #[cfg(feature = "visualize")]
+        if engine.is_key_pressed(KeyCode::Char('q')) {
+            break;
+        }
+
+        #[cfg(feature = "visualize")]
+        print_grid(rounds, &grove, &mut engine);
+        rounds += 1;
+    }
+
+    println!("{grove}",);
+
+    rounds
+}
+
+#[aoc(day23, part2)]
+fn part2_solver(input: &str) -> i32 {
+    part2_solve(input)
 }
 
 #[cfg(test)]
@@ -229,12 +303,12 @@ mod tests {
     use super::*;
 
     const REAL: &str = include_str!("../input/2022/day23.txt");
-    const EX: &str = ".....\n\
-                      ..##.\n\
-                      ..#..\n\
-                      .....\n\
-                      ..##.\n\
-                      .....";
+    // const EX: &str = ".....\n\
+    //                   ..##.\n\
+    //                   ..#..\n\
+    //                   .....\n\
+    //                   ..##.\n\
+    //                   .....";
 
     const EX2: &str = "....#..\n\
                        ..###.#\n\
@@ -245,7 +319,17 @@ mod tests {
                        .#..#..";
 
     #[test]
-    fn day23_part1_test() {
-        assert_eq!(part1_solve(EX2), 110);
+    fn day23_part1_example() {
+        assert_eq!(part1_solve(EX2, 10), 110);
+    }
+
+    #[test]
+    fn day23_part2_example() {
+        assert_eq!(part2_solve(EX2), 20);
+    }
+
+    #[test]
+    fn day23_part2_real() {
+        assert_eq!(part2_solve(REAL), 988);
     }
 }
