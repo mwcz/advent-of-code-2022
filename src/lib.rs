@@ -1,4 +1,5 @@
-#![feature(int_roundings)]
+#![feature(int_roundings, hash_drain_filter)]
+
 use aoc_runner_derive::aoc_lib;
 
 pub mod day1;

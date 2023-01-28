@@ -102,6 +102,11 @@ impl Grove {
     }
 }
 
+struct Move {
+    from: Point,
+    to: Point,
+}
+
 impl Iterator for Grove {
     type Item = ();
 
@@ -112,22 +117,52 @@ impl Iterator for Grove {
             let survey = self.survey(point);
             if !survey.is_empty() {
                 if survey.is_empty_north() {
-                    moves.push((point, Point(point.0, point.1 - 1)));
+                    moves.push(Move {
+                        from: *point,
+                        to: Point(point.0, point.1 - 1),
+                    });
                 }
                 if survey.is_empty_south() {
-                    moves.push((point, Point(point.0, point.1 + 1)));
+                    moves.push(Move {
+                        from: *point,
+                        to: Point(point.0, point.1 + 1),
+                    });
                 }
                 if survey.is_empty_east() {
-                    moves.push((point, Point(point.0 + 1, point.1)));
+                    moves.push(Move {
+                        from: *point,
+                        to: Point(point.0 + 1, point.1),
+                    });
                 }
                 if survey.is_empty_north() {
-                    moves.push((point, Point(point.0 - 1, point.1)));
+                    moves.push(Move {
+                        from: *point,
+                        to: Point(point.0 - 1, point.1),
+                    });
                 }
             }
         }
 
-        // TODO resume here: remove duplicate entries in the moves vec.  not just dedup, remove
-        // _all_ occurrences of dupes, ie 1,2,2,3 becomes 1,3
+        // create a historgram of moves
+        let mut histo = HashMap::new();
+        for mov in &moves {
+            let count = histo.entry(mov.to).or_insert(0);
+            *count += 1;
+        }
+
+        // filter out any moves that appeared more than once
+        histo = histo.drain_filter(|k, v| *v == 1).collect();
+
+        // apply the remaining moves
+        for mov in &moves {
+            // if the move occurred only once
+            if histo.contains_key(&mov.to) {
+                // remove the elf at mov.from from self.grid and reinsert it at mov.to
+                if let Some(elf) = self.grid.remove(&mov.from) {
+                    self.grid.insert(mov.to, elf);
+                }
+            }
+        }
 
         // second half
 
@@ -137,9 +172,10 @@ impl Iterator for Grove {
 
 impl Display for Grove {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        const PAD: i32 = 3;
         let bounds = self.bounding_box();
-        for y in 0..=bounds.height {
-            for x in 0..=bounds.width {
+        for y in -PAD..=(bounds.height+PAD) {
+            for x in -PAD..=(bounds.width+PAD) {
                 let cell = self.grid.get(&Point(x, y));
                 let symbol = match cell {
                     Some(_) => '#',
@@ -172,6 +208,10 @@ fn part1_solve(input: &str) -> usize {
     let mut grove = Grove::new(grid);
 
     println!("{}", grove);
+    grove.next();
+
+    println!("{}", grove);
+    grove.next();
 
     // let area = grove.grid.len() * grove.grid[0].len();
 
