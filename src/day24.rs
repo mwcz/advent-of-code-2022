@@ -1,6 +1,7 @@
 use aoc_runner_derive::aoc;
+use console_engine::{ConsoleEngine, KeyCode};
+use derive_more::{Add, AddAssign};
 use std::fmt::Display;
-use derive_more::{AddAssign,Add};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, AddAssign, Add)]
 struct Point(i32, i32);
@@ -56,7 +57,7 @@ impl Basin {
         Self {
             blizzards,
             height: height + 1, // +1 for the outer wall
-            width: width + 1, // +1 for the outer wall
+            width: width + 1,   // +1 for the outer wall
             loc: loc.unwrap(),
             start: start.unwrap(),
             end,
@@ -89,7 +90,7 @@ impl Display for Basin {
             for x in 0..self.width {
                 let p = Point(x, y);
                 let blizz: Vec<&Blizz> = self.blizzards.iter().filter(|&b| b.loc == p).collect();
-                if (y == 0 || x == 0 || y == self.height-1 || x == self.width-1)
+                if (y == 0 || x == 0 || y == self.height - 1 || x == self.width - 1)
                     && self.start != p
                     && self.end != p
                 {
@@ -97,7 +98,11 @@ impl Display for Basin {
                 } else if blizz.len() > 1 {
                     write!(f, "{}", blizz.len())?;
                 } else if blizz.len() == 1 {
-                    write!(f, "{}", std::convert::Into::<char>::into(*blizz.first().unwrap()))?;
+                    write!(
+                        f,
+                        "{}",
+                        std::convert::Into::<char>::into(*blizz.first().unwrap())
+                    )?;
                 } else {
                     write!(f, ".")?;
                 }
@@ -179,9 +184,28 @@ impl TryFrom<&Cell> for Blizz {
 
 fn part1_solve(input: &str) -> i64 {
     let mut basin = Basin::new(input);
-    println!("{basin}",);
-    basin.step();
-    println!("{basin}",);
+
+    #[cfg(feature = "visualize")]
+    let print_grid = |basin: &Basin, engine: &mut ConsoleEngine| {
+        engine.wait_frame();
+        engine.clear_screen();
+        engine.print(0, 0, &format!("{}", basin));
+        engine.draw();
+    };
+    #[cfg(feature = "visualize")]
+    let mut engine = ConsoleEngine::init(basin.width as u32, basin.height as u32 + 1, 4).unwrap();
+
+    loop {
+        basin.step();
+
+        #[cfg(feature = "visualize")]
+        if engine.is_key_pressed(KeyCode::Char('q')) {
+            break;
+        }
+        #[cfg(feature = "visualize")]
+        print_grid(&basin, &mut engine);
+    }
+
     todo!();
 }
 
@@ -194,6 +218,7 @@ fn part1_solver(input: &str) -> i64 {
 mod tests {
     use super::*;
 
+    const REAL: &str = include_str!("../input/2022/day24.txt");
     const EX: &str = "#.######
 #>>.<^<#
 #.<..<<#
@@ -204,5 +229,9 @@ mod tests {
     #[test]
     fn day24_part1_test() {
         assert_eq!(part1_solve(EX), 18);
+    }
+    #[test]
+    fn day24_part1_real() {
+        assert_eq!(part1_solve(REAL), 18);
     }
 }
