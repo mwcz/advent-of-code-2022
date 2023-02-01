@@ -1,7 +1,8 @@
 use aoc_runner_derive::aoc;
 use std::fmt::Display;
+use derive_more::{AddAssign,Add};
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, AddAssign, Add)]
 struct Point(i32, i32);
 
 #[derive(Debug)]
@@ -54,31 +55,49 @@ impl Basin {
 
         Self {
             blizzards,
-            height,
-            width,
+            height: height + 1, // +1 for the outer wall
+            width: width + 1, // +1 for the outer wall
             loc: loc.unwrap(),
             start: start.unwrap(),
             end,
         }
     }
 
-    fn step(&mut self) {}
+    fn step(&mut self) {
+        for blizz in self.blizzards.iter_mut() {
+            blizz.loc += blizz.dir;
+            if blizz.loc.0 == 0 {
+                blizz.loc.0 = self.width - 2;
+            }
+            if blizz.loc.1 == 0 {
+                blizz.loc.1 = self.height - 2;
+            }
+            if blizz.loc.0 == self.width - 1 {
+                blizz.loc.0 = 1;
+            }
+            if blizz.loc.1 == self.height - 1 {
+                blizz.loc.1 = 1;
+            }
+        }
+    }
 }
 
 impl Display for Basin {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        for y in 0..=self.height {
-            for x in 0..=self.width {
+        writeln!(f, "({}, {})", self.width, self.height)?;
+        for y in 0..self.height {
+            for x in 0..self.width {
                 let p = Point(x, y);
-                let blizz = self.blizzards.iter().find(|&b| b.loc == p);
-                if y == 0
-                    || x == 0
-                    || y == self.height
-                    || x == self.width && self.start != p && self.end != p
+                let blizz: Vec<&Blizz> = self.blizzards.iter().filter(|&b| b.loc == p).collect();
+                if (y == 0 || x == 0 || y == self.height-1 || x == self.width-1)
+                    && self.start != p
+                    && self.end != p
                 {
                     write!(f, "#")?;
-                } else if blizz.is_some() {
-                    write!(f, "{}", std::convert::Into::<char>::into(blizz.unwrap()))?;
+                } else if blizz.len() > 1 {
+                    write!(f, "{}", blizz.len())?;
+                } else if blizz.len() == 1 {
+                    write!(f, "{}", std::convert::Into::<char>::into(*blizz.first().unwrap()))?;
                 } else {
                     write!(f, ".")?;
                 }
@@ -159,7 +178,9 @@ impl TryFrom<&Cell> for Blizz {
 }
 
 fn part1_solve(input: &str) -> i64 {
-    let basin = Basin::new(input);
+    let mut basin = Basin::new(input);
+    println!("{basin}",);
+    basin.step();
     println!("{basin}",);
     todo!();
 }
