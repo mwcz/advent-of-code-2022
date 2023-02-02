@@ -192,8 +192,9 @@ fn part1_solve(input: &str) -> i64 {
         engine.print(0, 0, &format!("{}", basin));
         engine.draw();
     };
+    let fps = 4;
     #[cfg(feature = "visualize")]
-    let mut engine = ConsoleEngine::init(basin.width as u32, basin.height as u32 + 1, 4).unwrap();
+    let mut engine = ConsoleEngine::init(basin.width as u32, basin.height as u32 + 1, fps).unwrap();
 
     loop {
         basin.step();
