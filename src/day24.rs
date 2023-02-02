@@ -1,7 +1,9 @@
 use aoc_runner_derive::aoc;
+#[cfg(feature = "visualize")]
 use console_engine::{ConsoleEngine, KeyCode};
 use derive_more::{Add, AddAssign, Sub, SubAssign};
 use std::fmt::Display;
+use pathfinding::directed::astar::astar;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, AddAssign, Add, Sub, SubAssign)]
 struct Point(i32, i32);
@@ -15,6 +17,7 @@ impl Display for Point {
 #[derive(Debug)]
 struct Basin {
     blizzards: Vec<Blizz>,
+    nogo: Vec<Vec<bool>>,
     height: i32,
     width: i32,
     start: Point,
@@ -59,6 +62,7 @@ impl Basin {
 
         Self {
             blizzards,
+            nogo: vec![vec![false; width as usize]; height as usize],
             height: height + 1, // +1 for the outer wall
             width: width + 1,   // +1 for the outer wall
             start: start.unwrap(),
@@ -67,6 +71,11 @@ impl Basin {
     }
 
     fn step(&mut self) {
+        for row in self.nogo.iter_mut() {
+            for cell in row.iter_mut() {
+                *cell = false;
+            }
+        }
         for blizz in self.blizzards.iter_mut() {
             blizz.loc += blizz.dir;
             if blizz.loc.0 == 0 {
@@ -81,6 +90,7 @@ impl Basin {
             if blizz.loc.1 == self.height - 1 {
                 blizz.loc.1 = 1;
             }
+            self.nogo[blizz.loc.1 as usize][blizz.loc.0 as usize] = true;
         }
     }
 
@@ -97,15 +107,13 @@ impl Basin {
         .filter(|&loc| {
             let is_start = loc == self.start;
             let is_end = loc == self.end;
+            let back_to_start = from != self.start && is_start;
             let tl_wall = loc.0 == 0 || loc.1 == 0;
             let br_wall = loc.0 == (self.width - 1) || loc.1 == (self.height - 1);
             let oob = loc.0 < 0 || loc.1 < 0 || loc.0 > self.width || loc.1 > self.height;
-            self.blizzards
-                .iter()
-                .find(|&blizz| blizz.loc == loc)
-                .is_none()
-                && !oob
-                && ((is_start || is_end) || (!tl_wall && !br_wall))
+            let is_blizz = self.nogo.get( loc.1 as usize ).map_or(true, |row| *row.get(loc.0 as usize).unwrap_or(&true));
+
+            !back_to_start && !is_blizz && !oob && ((is_start || is_end) || (!tl_wall && !br_wall))
         })
         .collect()
     }
@@ -220,6 +228,7 @@ fn part1_solve(input: &str) -> usize {
         engine.print(0, 0, &format!("{}", basin));
         engine.draw();
     };
+    #[cfg(feature = "visualize")]
     let fps = 4;
     #[cfg(feature = "visualize")]
     let mut engine = ConsoleEngine::init(basin.width as u32, basin.height as u32 + 1, fps).unwrap();
@@ -230,6 +239,7 @@ fn part1_solve(input: &str) -> usize {
     let mut threshold = 0;
 
     loop {
+        // println!("loop");
         basin.step();
 
         #[cfg(feature = "visualize")]
@@ -248,33 +258,52 @@ fn part1_solve(input: &str) -> usize {
                 updated_path.push(mov);
 
                 let ratio = basin.width / basin.height;
+
+                // calculate how much progress this path is making overall
                 let new_progress = path
                     .iter()
                     .map(|p| p.0 + p.1 * ratio)
                     .reduce(|acc, p| p - acc)
                     .unwrap();
 
+                // // calculate how much progress this path has made _recently_
+                // let prog_cand = 16; // how many elements to consider for progress calculations
+                // let new_progress = path[path.len().checked_sub(prog_cand).unwrap_or(0)..]
+                //     .iter()
+                //     .map(|p| p.0 + p.1 * ratio)
+                //     .reduce(|acc, p| p - acc)
+                //     .unwrap();
+
                 if mov == basin.end {
                     return updated_path.len() - 1;
                 }
 
                 // if updated_path.len() < 20 || progress >= (updated_path.len()/8) as i32 {
+                println!(
+                    "len {}\tprogress {}\tthreshold {threshold}\t{}",
+                    updated_path.len(),
+                    progress,
+                    updated_path.iter().map(|p| p.to_string()).collect::<String>()
+                );
                 if progress >= threshold {
-                    // println!("len {} progress {}", updated_path.len(), progress);
+                    // println!("len {}\tprogress {}\tthreshold {threshold}", updated_path.len(), progress);
                     paths.push((new_progress, updated_path));
                 }
+                // paths.push((new_progress, updated_path));
             }
         }
 
-        // // median
-        // let mut progresses: Vec<i32> = paths.iter().map(|(progress, _)| *progress).collect();
-        // progresses.sort();
-        // threshold = progresses[progresses.len() / 2];
-
-        // average
-        if let Some(progresses) = paths.iter().map(|(progress, _)| *progress).reduce(|acc, p| acc + p) {
-            threshold = progresses / (paths.len() as i32);
+        // median
+        let mut progs: Vec<i32> = paths.iter().map(|(progress, _)| *progress).collect();
+        progs.sort();
+        if let Some(quartile) = progs.get(progs.len() / 2) {
+            threshold = *quartile;
         }
+
+        // // average
+        // if let Some(progresses) = paths.iter().map(|(progress, _)| *progress).reduce(|acc, p| acc + p) {
+        //     threshold = progresses / (paths.len() as i32);
+        // }
     }
 
     unreachable!();
