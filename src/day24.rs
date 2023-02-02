@@ -1,17 +1,22 @@
 use aoc_runner_derive::aoc;
 use console_engine::{ConsoleEngine, KeyCode};
-use derive_more::{Add, AddAssign};
+use derive_more::{Add, AddAssign, Sub, SubAssign};
 use std::fmt::Display;
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, AddAssign, Add)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, AddAssign, Add, Sub, SubAssign)]
 struct Point(i32, i32);
+
+impl Display for Point {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "({},{})", self.0, self.1)
+    }
+}
 
 #[derive(Debug)]
 struct Basin {
     blizzards: Vec<Blizz>,
     height: i32,
     width: i32,
-    loc: Point,
     start: Point,
     end: Point,
 }
@@ -52,13 +57,10 @@ impl Basin {
             }
         }
 
-        let loc = start;
-
         Self {
             blizzards,
             height: height + 1, // +1 for the outer wall
             width: width + 1,   // +1 for the outer wall
-            loc: loc.unwrap(),
             start: start.unwrap(),
             end,
         }
@@ -80,6 +82,32 @@ impl Basin {
                 blizz.loc.1 = 1;
             }
         }
+    }
+
+    /// Find valid moves from a given point at the current timestep.
+    fn moves(&self, from: Point) -> Vec<Point> {
+        [
+            from,                // wait
+            from + Point(1, 0),  // right
+            from + Point(-1, 0), // left
+            from + Point(0, 1),  // down
+            from + Point(0, -1), // up
+        ]
+        .into_iter()
+        .filter(|&loc| {
+            let is_start = loc == self.start;
+            let is_end = loc == self.end;
+            let tl_wall = loc.0 == 0 || loc.1 == 0;
+            let br_wall = loc.0 == (self.width - 1) || loc.1 == (self.height - 1);
+            let oob = loc.0 < 0 || loc.1 < 0 || loc.0 > self.width || loc.1 > self.height;
+            self.blizzards
+                .iter()
+                .find(|&blizz| blizz.loc == loc)
+                .is_none()
+                && !oob
+                && ((is_start || is_end) || (!tl_wall && !br_wall))
+        })
+        .collect()
     }
 }
 
@@ -182,7 +210,7 @@ impl TryFrom<&Cell> for Blizz {
     }
 }
 
-fn part1_solve(input: &str) -> i64 {
+fn part1_solve(input: &str) -> usize {
     let mut basin = Basin::new(input);
 
     #[cfg(feature = "visualize")]
@@ -196,6 +224,11 @@ fn part1_solve(input: &str) -> i64 {
     #[cfg(feature = "visualize")]
     let mut engine = ConsoleEngine::init(basin.width as u32, basin.height as u32 + 1, fps).unwrap();
 
+    let mut paths = vec![(0, vec![basin.start])];
+
+    // rolling progress threshold
+    let mut threshold = 0;
+
     loop {
         basin.step();
 
@@ -205,13 +238,50 @@ fn part1_solve(input: &str) -> i64 {
         }
         #[cfg(feature = "visualize")]
         print_grid(&basin, &mut engine);
+
+        let path_search: Vec<(i32, Vec<Point>)> = paths.drain(..).collect();
+
+        for (progress, path) in path_search {
+            // add each valid move direction to the queue
+            for mov in basin.moves(*path.last().unwrap()) {
+                let mut updated_path = path.clone();
+                updated_path.push(mov);
+
+                let ratio = basin.width / basin.height;
+                let new_progress = path
+                    .iter()
+                    .map(|p| p.0 + p.1 * ratio)
+                    .reduce(|acc, p| p - acc)
+                    .unwrap();
+
+                if mov == basin.end {
+                    return updated_path.len() - 1;
+                }
+
+                // if updated_path.len() < 20 || progress >= (updated_path.len()/8) as i32 {
+                if progress >= threshold {
+                    // println!("len {} progress {}", updated_path.len(), progress);
+                    paths.push((new_progress, updated_path));
+                }
+            }
+        }
+
+        // // median
+        // let mut progresses: Vec<i32> = paths.iter().map(|(progress, _)| *progress).collect();
+        // progresses.sort();
+        // threshold = progresses[progresses.len() / 2];
+
+        // average
+        if let Some(progresses) = paths.iter().map(|(progress, _)| *progress).reduce(|acc, p| acc + p) {
+            threshold = progresses / (paths.len() as i32);
+        }
     }
 
-    todo!();
+    unreachable!();
 }
 
 #[aoc(day24, part1)]
-fn part1_solver(input: &str) -> i64 {
+fn part1_solver(input: &str) -> usize {
     part1_solve(input)
 }
 
@@ -228,7 +298,7 @@ mod tests {
 ######.#";
 
     #[test]
-    fn day24_part1_test() {
+    fn day24_part1_example() {
         assert_eq!(part1_solve(EX), 18);
     }
     #[test]
