@@ -39,10 +39,8 @@ impl From<&str> for Monkey {
             .last()
             .unwrap()
             .split(',')
-            .map(|n| {
-                Item {
-                    worry: n.trim().parse::<u64>().unwrap(),
-                }
+            .map(|n| Item {
+                worry: n.trim().parse::<u64>().unwrap(),
             })
             .collect();
 
@@ -157,11 +155,11 @@ fn part2_solve(input: &str) -> u64 {
                 monkey.items_seen += 1;
                 item.worry = match monkey.op.op {
                     MathOp::Mul => match &monkey.op.value {
-                        Some(val) => item.worry*val,
+                        Some(val) => item.worry * val,
                         None => item.worry * item.worry,
                     },
                     MathOp::Add => match &monkey.op.value {
-                        Some(val) => item.worry+val,
+                        Some(val) => item.worry + val,
                         None => {
                             unreachable!();
                         }

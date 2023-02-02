@@ -23,7 +23,6 @@ struct Inode<'name> {
     /// The size of the inode.  0 for dirs, >0 for files.
     size: u32,
     /// The size of all the contents of this inode (for dirs).
-    content_size: u32,
     /// The index of the parent inode.  Only the root node has None.
     parent: Option<usize>,
     /// The index of this inode in the inode table.
@@ -33,18 +32,13 @@ struct Inode<'name> {
 #[derive(Debug)]
 struct Filesystem<'inode> {
     inodes: Vec<Inode<'inode>>,
-    // /// Cache of dir sizes (recursive).  Inode index -> u32 size.
-    // dir_sizes: Vec<(usize, u32)>,
 }
 
 impl<'inode> Filesystem<'inode> {
     fn new(logs: Vec<Log<'inode>>) -> Filesystem<'inode> {
         let mut cwd: usize = 0;
 
-        let mut fs = Filesystem {
-            inodes: vec![],
-            // dir_sizes: vec![],
-        };
+        let mut fs = Filesystem { inodes: vec![] };
 
         for log in logs {
             match log {
@@ -70,9 +64,6 @@ impl<'inode> Filesystem<'inode> {
             }
         }
 
-        let total_size = fs.dir_size(None);
-        println!("{total_size}");
-
         fs
     }
 
@@ -86,7 +77,6 @@ impl<'inode> Filesystem<'inode> {
             size,
             parent,
             idx,
-            content_size: 0,
         });
         idx
     }
@@ -109,9 +99,6 @@ impl<'inode> Filesystem<'inode> {
             .partition(|inode| inode.size == 0);
 
         let files_size = files.iter().map(|file| file.size).sum::<u32>();
-
-        // cache the dir size
-        // self.dir_sizes.push((idx.unwrap_or(0), files_size));
 
         let dirs_size = dirs
             .iter()
@@ -137,7 +124,12 @@ impl<'inode> Filesystem<'inode> {
     }
 
     fn used_space(&self) -> u32 {
-        self.dir_size(self.inodes.iter().find(|&inode| inode.name == "/").map(|inode| inode.idx))
+        self.dir_size(
+            self.inodes
+                .iter()
+                .find(|&inode| inode.name == "/")
+                .map(|inode| inode.idx),
+        )
     }
 
     fn free_up(&self, total: u32, needed: u32) -> Option<u32> {
@@ -153,11 +145,11 @@ impl<'inode> Filesystem<'inode> {
                     }
                 }
                 None
-            }).min()
+            })
+            .min()
     }
 }
 
-#[aoc(day7, part1)]
 fn part1_solve(input: &str) -> u32 {
     let (_, entries) = parse::log(input).expect("could not parse input");
 
@@ -166,20 +158,30 @@ fn part1_solve(input: &str) -> u32 {
     fs.sum_under(100000)
 }
 
-#[aoc(day7, part2)]
+#[aoc(day7, part1)]
+fn part1_solver(input: &str) -> u32 {
+    part1_solve(input)
+}
+
 fn part2_solve(input: &str) -> u32 {
     let (_, entries) = parse::log(input).expect("could not parse input");
 
     let fs = Filesystem::new(entries);
 
-    fs.free_up(70_000_000, 30_000_000).expect("no dir found that can free up enough space")
+    fs.free_up(70_000_000, 30_000_000)
+        .expect("no dir found that can free up enough space")
 }
 
-#[test]
-fn day7_test() {
-    let ex = Filesystem::new(
-        parse::log(
-            "$ cd /
+#[aoc(day7, part2)]
+fn part2_solver(input: &str) -> u32 {
+    part2_solve(input)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    const EX: &str = "$ cd /
 $ ls
 dir a
 14848514 b.txt
@@ -201,11 +203,26 @@ $ ls
 4060174 j
 8033020 d.log
 5626152 d.ext
-7214296 k",
-        )
-        .unwrap()
-        .1,
-    );
-    assert_eq!(ex.sum_under(100000), 95437);
-}
+7214296 k";
+    const REAL: &str = include_str!("../input/2022/day7.txt");
 
+    #[test]
+    fn day7_part1_example() {
+        assert_eq!(part1_solve(EX), 95437);
+    }
+
+    #[test]
+    fn day7_part1_real() {
+        assert_eq!(part1_solve(REAL), 1232307);
+    }
+
+    #[test]
+    fn day7_part2_example() {
+        assert_eq!(part2_solve(EX), 24933642);
+    }
+
+    #[test]
+    fn day7_part2_real() {
+        assert_eq!(part2_solve(REAL), 7268994);
+    }
+}

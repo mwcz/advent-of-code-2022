@@ -1,4 +1,5 @@
-#![feature(int_roundings)]
+#![feature(int_roundings, hash_drain_filter)]
+
 use aoc_runner_derive::aoc_lib;
 
 pub mod day1;
@@ -22,7 +23,8 @@ pub mod day18;
 pub mod day19;
 pub mod day20;
 pub mod day21;
-// pub mod day22;
+pub mod day22;
+pub mod day23;
 pub mod day24;
 
 aoc_lib! { year = 2022 }

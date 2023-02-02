@@ -1,5 +1,5 @@
-use std::collections::VecDeque;
 use aoc_runner_derive::aoc;
+use std::collections::VecDeque;
 
 // fn print(bowl: &VecDeque<(usize, i64)>) -> String {
 //     format!("{:?}", bowl.iter().map(|n| n.1).collect::<Vec<i64>>())
@@ -48,7 +48,7 @@ fn part1_solve(input: &str) -> i64 {
     let y = spinning_bowl.nth(999).unwrap();
     let z = spinning_bowl.nth(999).unwrap();
 
-    println!("{:?}", (x,y,z));
+    println!("{:?}", (x, y, z));
 
     x + y + z
 }
