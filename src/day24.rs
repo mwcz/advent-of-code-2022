@@ -1,11 +1,10 @@
 use aoc_runner_derive::aoc;
-#[cfg(feature = "visualize")]
-use console_engine::{ConsoleEngine, KeyCode};
 use derive_more::{Add, AddAssign, Sub, SubAssign};
-use std::fmt::Display;
+use itertools::Itertools;
 use pathfinding::directed::astar::astar;
+use std::fmt::Display;
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, AddAssign, Add, Sub, SubAssign)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, AddAssign, Add, Sub, SubAssign, Hash)]
 struct Point(i32, i32);
 
 impl Display for Point {
@@ -14,7 +13,7 @@ impl Display for Point {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 struct Basin {
     blizzards: Vec<Blizz>,
     nogo: Vec<Vec<bool>>,
@@ -107,13 +106,20 @@ impl Basin {
         .filter(|&loc| {
             let is_start = loc == self.start;
             let is_end = loc == self.end;
-            let back_to_start = from != self.start && is_start;
+            // let back_to_start = from != self.start && is_start;
             let tl_wall = loc.0 == 0 || loc.1 == 0;
             let br_wall = loc.0 == (self.width - 1) || loc.1 == (self.height - 1);
             let oob = loc.0 < 0 || loc.1 < 0 || loc.0 > self.width || loc.1 > self.height;
-            let is_blizz = self.nogo.get( loc.1 as usize ).map_or(true, |row| *row.get(loc.0 as usize).unwrap_or(&true));
+            let is_blizz = self
+                .nogo
+                .get(loc.1 as usize)
+                .map_or(true, |row| *row.get(loc.0 as usize).unwrap_or(&true));
 
-            !back_to_start && !is_blizz && !oob && ((is_start || is_end) || (!tl_wall && !br_wall))
+            let is_good = is_end
+                || (/* !back_to_start &&*/ !is_blizz && !oob && ((is_start) || !(tl_wall || br_wall)));
+            // println!("{loc}\tis_start:\t{is_start}\tis_end:\t{is_end}\tback_to_start:\t{back_to_start}\ttl_wall:\t{tl_wall}\tbr_wall:\t{br_wall}\toob:\t{oob}\tis_blizz:\t{is_blizz}");
+
+            is_good
         })
         .collect()
     }
@@ -173,7 +179,7 @@ impl From<(char, i32, i32)> for Cell {
     }
 }
 
-#[derive(Debug, Eq, PartialEq)]
+#[derive(Debug, Eq, PartialEq, Clone)]
 struct Blizz {
     loc: Point,
     dir: Point,
@@ -218,100 +224,98 @@ impl TryFrom<&Cell> for Blizz {
     }
 }
 
-fn part1_solve(input: &str) -> usize {
+fn part1_solve(input: &str) -> i32 {
     let mut basin = Basin::new(input);
 
-    #[cfg(feature = "visualize")]
-    let print_grid = |basin: &Basin, engine: &mut ConsoleEngine| {
-        engine.wait_frame();
-        engine.clear_screen();
-        engine.print(0, 0, &format!("{}", basin));
-        engine.draw();
+    let basins = (0..(basin.width * basin.height))
+        .into_iter()
+        .map(|_| {
+            basin.step();
+            basin.clone()
+        })
+        .collect_vec();
+
+    // for pathfinding, combine the grid Point with a usize representing the iteration number.
+    // this is only because the pathfinding crate's algos refuse to revisit the same point twice,
+    // but revisiting is required to solve this problem.
+    type PathPoint = (Point, usize);
+    let start = (basin.start, 0);
+    let successors = |p: &PathPoint| -> Vec<(PathPoint, i32)> {
+        basins[p.1]
+            .moves(p.0)
+            .into_iter()
+            .map(|next| ((next, p.1 + 1), 1))
+            .collect()
     };
-    #[cfg(feature = "visualize")]
-    let fps = 4;
-    #[cfg(feature = "visualize")]
-    let mut engine = ConsoleEngine::init(basin.width as u32, basin.height as u32 + 1, fps).unwrap();
+    let heuristic = |p: &PathPoint| {
+        let diff = basin.end - p.0;
+        diff.0 + diff.1
+    };
+    let success = |p: &PathPoint| p.0 == basin.end;
 
-    let mut paths = vec![(0, vec![basin.start])];
+    let answer = astar(&start, successors, heuristic, success);
 
-    // rolling progress threshold
-    let mut threshold = 0;
-
-    loop {
-        // println!("loop");
-        basin.step();
-
-        #[cfg(feature = "visualize")]
-        if engine.is_key_pressed(KeyCode::Char('q')) {
-            break;
-        }
-        #[cfg(feature = "visualize")]
-        print_grid(&basin, &mut engine);
-
-        let path_search: Vec<(i32, Vec<Point>)> = paths.drain(..).collect();
-
-        for (progress, path) in path_search {
-            // add each valid move direction to the queue
-            for mov in basin.moves(*path.last().unwrap()) {
-                let mut updated_path = path.clone();
-                updated_path.push(mov);
-
-                let ratio = basin.width / basin.height;
-
-                // calculate how much progress this path is making overall
-                let new_progress = path
-                    .iter()
-                    .map(|p| p.0 + p.1 * ratio)
-                    .reduce(|acc, p| p - acc)
-                    .unwrap();
-
-                // // calculate how much progress this path has made _recently_
-                // let prog_cand = 16; // how many elements to consider for progress calculations
-                // let new_progress = path[path.len().checked_sub(prog_cand).unwrap_or(0)..]
-                //     .iter()
-                //     .map(|p| p.0 + p.1 * ratio)
-                //     .reduce(|acc, p| p - acc)
-                //     .unwrap();
-
-                if mov == basin.end {
-                    return updated_path.len() - 1;
-                }
-
-                // if updated_path.len() < 20 || progress >= (updated_path.len()/8) as i32 {
-                println!(
-                    "len {}\tprogress {}\tthreshold {threshold}\t{}",
-                    updated_path.len(),
-                    progress,
-                    updated_path.iter().map(|p| p.to_string()).collect::<String>()
-                );
-                if progress >= threshold {
-                    // println!("len {}\tprogress {}\tthreshold {threshold}", updated_path.len(), progress);
-                    paths.push((new_progress, updated_path));
-                }
-                // paths.push((new_progress, updated_path));
-            }
-        }
-
-        // median
-        let mut progs: Vec<i32> = paths.iter().map(|(progress, _)| *progress).collect();
-        progs.sort();
-        if let Some(quartile) = progs.get(progs.len() / 2) {
-            threshold = *quartile;
-        }
-
-        // // average
-        // if let Some(progresses) = paths.iter().map(|(progress, _)| *progress).reduce(|acc, p| acc + p) {
-        //     threshold = progresses / (paths.len() as i32);
-        // }
-    }
-
-    unreachable!();
+    answer.unwrap().1
 }
 
 #[aoc(day24, part1)]
-fn part1_solver(input: &str) -> usize {
+fn part1_solver(input: &str) -> i32 {
     part1_solve(input)
+}
+
+fn part2_solve(input: &str) -> i32 {
+    let mut basin = Basin::new(input);
+
+    let basins = (0..3*(basin.width * basin.height))
+        .into_iter()
+        .map(|_| {
+            basin.step();
+            basin.clone()
+        })
+        .collect_vec();
+
+    // for pathfinding, combine the grid Point with a usize representing the iteration number.
+    // this is only because the pathfinding crate's algos refuse to revisit the same point twice,
+    // but revisiting is required to solve this problem.
+    type PathPoint = (Point, usize);
+    let successors = |p: &PathPoint| -> Vec<(PathPoint, i32)> {
+        let moves = basins[p.1]
+            .moves(p.0)
+            .into_iter()
+            .map(|next| ((next, p.1 + 1), 1))
+            .collect();
+        // println!("{moves:?}");
+        moves
+    };
+    let heuristic1 = |p: &PathPoint| {
+        let diff = basin.end - p.0;
+        diff.0 + diff.1
+    };
+    let heuristic2 = |p: &PathPoint| {
+        let diff = basin.start - p.0;
+        diff.0 + diff.1
+    };
+    let success1 = |p: &PathPoint| p.0 == basin.end;
+    let success2 = |p: &PathPoint| p.0 == basin.start;
+
+    // to goal
+    let start1 = (basin.start, 0);
+    let phase1 = astar(&start1, successors, heuristic1, success1).unwrap();
+
+    // back to start
+    let start2 = (basin.end, phase1.1 as usize);
+    let phase2 = astar(&start2, successors, heuristic2, success2).unwrap();
+
+    // back to goal with little elfie mcforgetful's snacks
+    let start3 = (basin.start, (phase1.1 + phase2.1) as usize);
+    let phase3 = astar(&start3, successors, heuristic1, success1).unwrap();
+
+    phase1.1 + phase2.1 + phase3.1
+}
+
+#[aoc(day24, part2)]
+fn part2_solver(input: &str) -> i32 {
+    part2_solve(input)
 }
 
 #[cfg(test)]
@@ -332,6 +336,15 @@ mod tests {
     }
     #[test]
     fn day24_part1_real() {
-        assert_eq!(part1_solve(REAL), 18);
+        assert_eq!(part1_solve(REAL), 290);
+    }
+
+    #[test]
+    fn day24_part2_example() {
+        assert_eq!(part2_solve(EX), 54);
+    }
+    #[test]
+    fn day24_part2_real() {
+        assert_eq!(part2_solve(REAL), 842);
     }
 }
