@@ -1,8 +1,12 @@
 use aoc_runner_derive::aoc;
+use console_engine::crossterm::style::Stylize;
 use derive_more::{Add, AddAssign, Sub, SubAssign};
 use itertools::Itertools;
 use pathfinding::directed::astar::astar;
 use std::fmt::Display;
+
+#[cfg(feature = "visualize")]
+use console_engine::{ConsoleEngine, KeyCode};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, AddAssign, Add, Sub, SubAssign, Hash)]
 struct Point(i32, i32);
@@ -127,7 +131,6 @@ impl Basin {
 
 impl Display for Basin {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        writeln!(f, "({}, {})", self.width, self.height)?;
         for y in 0..self.height {
             for x in 0..self.width {
                 let p = Point(x, y);
@@ -266,7 +269,35 @@ fn part1_solver(input: &str) -> i32 {
 fn part2_solve(input: &str) -> i32 {
     let mut basin = Basin::new(input);
 
-    let basins = (0..3*(basin.width * basin.height))
+    #[cfg(feature = "visualize")]
+    let print_grid = |basin: &Basin, player: &Point, engine: &mut ConsoleEngine| {
+        engine.wait_frame();
+        engine.clear_screen();
+        let basin_out = format!("{}", basin);
+        let basin_out = basin_out
+            .lines()
+            .enumerate()
+            .map(|(y, line)| {
+                if y == player.1 as usize {
+                    line.chars()
+                        .enumerate()
+                        .map(|(x, c)| if x == player.0 as usize { '█' } else { c })
+                        .collect::<String>()
+                } else {
+                    line.to_string()
+                }
+            })
+            .collect_vec();
+        engine.print(0, 0, &basin_out.join("\n"));
+        engine.draw();
+    };
+
+    #[cfg(feature = "visualize")]
+    let fps = 30;
+    #[cfg(feature = "visualize")]
+    let mut engine = ConsoleEngine::init(basin.width as u32, basin.height as u32 + 1, fps).unwrap();
+
+    let basins = (0..3 * (basin.width * basin.height))
         .into_iter()
         .map(|_| {
             basin.step();
@@ -309,6 +340,34 @@ fn part2_solve(input: &str) -> i32 {
     // back to goal with little elfie mcforgetful's snacks
     let start3 = (basin.start, (phase1.1 + phase2.1) as usize);
     let phase3 = astar(&start3, successors, heuristic1, success1).unwrap();
+
+    #[cfg(feature = "visualize")]
+    {
+        let steps = phase1
+            .0
+            .iter()
+            .chain(phase2.0.iter())
+            .chain(phase3.0.iter());
+        let mut last_step = 0;
+        for step in steps {
+            if engine.is_key_pressed(KeyCode::Char('q')) {
+                break;
+            }
+            print_grid(basins.get(step.1).unwrap(), &step.0, &mut engine);
+            last_step = step.1;
+        }
+        let last_basin = basins.get(last_step).unwrap();
+
+        // keep the animation running for a few more steps
+        for _ in 0..14 {
+            last_step += 1;
+            print_grid(
+                &basins.get(last_step).unwrap(),
+                &last_basin.end,
+                &mut engine,
+            );
+        }
+    }
 
     phase1.1 + phase2.1 + phase3.1
 }
