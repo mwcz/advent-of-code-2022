@@ -21,6 +21,15 @@ fn ufans(num: i32) -> String {
     let mut chars: Vec<char> = vec![];
     let mut pow = 5_i32.pow(chars.len() as u32);
 
+    // 976
+    // 2=-01
+    //
+    //  2 * 5^4
+    // -2 * 5^3
+    // -1 * 5^2
+    //  0 * 5^1
+    //  1 * 5^0
+
     loop {
 
 
