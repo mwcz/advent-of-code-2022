@@ -1,15 +1,12 @@
+use aoc_runner_derive::aoc;
 use std::collections::HashMap;
 
-use aoc_runner_derive::aoc;
-use itertools::{repeat_n, CombinationsWithReplacement, Itertools};
-use rayon::prelude::*;
-
-fn snafu(enc: &str) -> i64 {
+fn snafu(enc: &str) -> i128 {
     enc.chars()
         .rev()
         .enumerate()
         .map(|(i, c)| {
-            5_i64.pow(i as u32)
+            5_i128.pow(i as u32)
                 * match c {
                     '-' => -1,
                     '=' => -2,
@@ -18,64 +15,47 @@ fn snafu(enc: &str) -> i64 {
         })
         .sum()
 }
-fn ufans(num: i64) -> String {
-    // num.to_string().chars().rev()
-
-    let mut num = num;
+fn ufans(num: i128) -> String {
     let mut chars: Vec<char> = vec![];
-    let mut pow = 5_i64.pow(chars.len() as u32);
+    let max_exp = num.to_string().len() as u32; // maximum exponent of 5 to consider for this number
+    let mut num = num;
 
-    // 976
-    // 2=-01
-    //
-    //  2 * 5^4
-    // -2 * 5^3
-    // -1 * 5^2
-    //  0 * 5^1
-    //  1 * 5^0
+    while num != 0 {
+        for exp in (0..=max_exp*4).rev() {
+            let coefs = [-2, -1, 0, 1, 2];
+            let values = coefs.map(|coef| {
+                let pow = coef * 5_i128.pow(exp);
+                let dist = (num - pow).abs();
+                (coef, pow, dist, exp)
+            });
+            let best = values.iter().min_by(|a, b| a.2.cmp(&b.2));
+            let best_coef = best.unwrap().0;
 
-    loop {
-        if num < pow {
-            pow /= 5;
-        }
-
-        if num == 0 {
-            break;
+            // don't add leading zeroes
+            if !(chars.is_empty() && best_coef == 0) {
+                chars.push(match best_coef {
+                    -2 => '=',
+                    -1 => '-',
+                    0 => '0',
+                    1 => '1',
+                    2 => '2',
+                    _ => panic!("invalid coefficient"),
+                });
+                // println!("{best:?}");
+                num -= best.unwrap().1;
+            }
         }
     }
 
-    todo!();
+    chars.iter().collect::<String>()
 }
 
-fn part1_solve(input: &str) -> i64 {
-    let chars = ['-', '=', '0', '1', '2'];
-
-    // build a lookup table of all possible snafus
-
-    let mut snafu_lut: HashMap<i64, String> = HashMap::new();
-    let range = (1..=20).into_par_iter();
-    let all_snafus: Vec<Vec<String>> = range.map(|i| {
-        /*
-            let snafus = chars
-                .iter()
-                .combinations_with_replacement(i)
-        */
-        let snafus: Vec<String> = repeat_n(chars.iter(), i)
-            .multi_cartesian_product()
-            .map(|chars| chars.into_iter().collect::<String>())
-            .collect();
-        println!("{i} done", );
-
-        snafus
-    }).collect();
-
-    println!("{:#?}", snafu_lut.get(&976).unwrap());
-
-    todo!();
+fn part1_solve(input: &str) -> String {
+    ufans(input.lines().map(snafu).sum())
 }
 
 #[aoc(day25, part1)]
-fn part1_solver(input: &str) -> i64 {
+fn part1_solver(input: &str) -> String {
     part1_solve(input)
 }
 
@@ -99,7 +79,7 @@ mod tests {
 122";
 
     #[test]
-    fn day25_part1_snafu() {
+    fn day25_snafu() {
         assert_eq!(snafu("1"), 1);
         assert_eq!(snafu("2"), 2);
         assert_eq!(snafu("1="), 3);
@@ -130,7 +110,7 @@ mod tests {
         assert_eq!(snafu("122"), 37);
     }
     #[test]
-    fn day25_part1_ufans() {
+    fn day25_ufans() {
         assert_eq!(ufans(1), "1");
         assert_eq!(ufans(2), "2");
         assert_eq!(ufans(3), "1=");
@@ -162,10 +142,10 @@ mod tests {
     }
     #[test]
     fn day25_part1_example() {
-        assert_eq!(part1_solve(EX), 4890);
+        assert_eq!(part1_solve(EX), "2=-1=0".to_string());
     }
     #[test]
     fn day25_part1_real() {
-        assert_eq!(part1_solve(REAL), 290);
+        assert_eq!(part1_solve(REAL), "0".to_string());
     }
 }
