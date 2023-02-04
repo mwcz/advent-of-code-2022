@@ -1,11 +1,15 @@
-use aoc_runner_derive::aoc;
+use std::collections::HashMap;
 
-fn snafu(enc: &str) -> i32 {
+use aoc_runner_derive::aoc;
+use itertools::{repeat_n, CombinationsWithReplacement, Itertools};
+use rayon::prelude::*;
+
+fn snafu(enc: &str) -> i64 {
     enc.chars()
         .rev()
         .enumerate()
         .map(|(i, c)| {
-            5_i32.pow(i as u32)
+            5_i64.pow(i as u32)
                 * match c {
                     '-' => -1,
                     '=' => -2,
@@ -14,12 +18,12 @@ fn snafu(enc: &str) -> i32 {
         })
         .sum()
 }
-fn ufans(num: i32) -> String {
+fn ufans(num: i64) -> String {
     // num.to_string().chars().rev()
 
     let mut num = num;
     let mut chars: Vec<char> = vec![];
-    let mut pow = 5_i32.pow(chars.len() as u32);
+    let mut pow = 5_i64.pow(chars.len() as u32);
 
     // 976
     // 2=-01
@@ -31,8 +35,6 @@ fn ufans(num: i32) -> String {
     //  1 * 5^0
 
     loop {
-
-
         if num < pow {
             pow /= 5;
         }
@@ -45,13 +47,35 @@ fn ufans(num: i32) -> String {
     todo!();
 }
 
-fn part1_solve(input: &str) -> i32 {
-    println!("{}", snafu("2=-01"));
+fn part1_solve(input: &str) -> i64 {
+    let chars = ['-', '=', '0', '1', '2'];
+
+    // build a lookup table of all possible snafus
+
+    let mut snafu_lut: HashMap<i64, String> = HashMap::new();
+    let range = (1..=20).into_par_iter();
+    let all_snafus: Vec<Vec<String>> = range.map(|i| {
+        /*
+            let snafus = chars
+                .iter()
+                .combinations_with_replacement(i)
+        */
+        let snafus: Vec<String> = repeat_n(chars.iter(), i)
+            .multi_cartesian_product()
+            .map(|chars| chars.into_iter().collect::<String>())
+            .collect();
+        println!("{i} done", );
+
+        snafus
+    }).collect();
+
+    println!("{:#?}", snafu_lut.get(&976).unwrap());
+
     todo!();
 }
 
 #[aoc(day25, part1)]
-fn part1_solver(input: &str) -> i32 {
+fn part1_solver(input: &str) -> i64 {
     part1_solve(input)
 }
 
