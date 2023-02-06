@@ -104,7 +104,11 @@ impl<const STACK_COUNT: usize> Supplies<STACK_COUNT> {
             // add number labels to the stacks
             output.push((1..=stacks.len()).map(|n| format!(" {}  ", n)).collect());
 
-            engine.print(0, (engine.get_height() - (height as u32)) as i32 - 2, &output.join("\n"));
+            engine.print(
+                0,
+                (engine.get_height() - (height as u32)) as i32 - 2,
+                &output.join("\n"),
+            );
             engine.draw();
         };
 
