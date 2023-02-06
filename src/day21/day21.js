@@ -1885,7 +1885,7 @@ fontcolor="#efefef"
 labelfontcolor="#efefef"
 pencolor="#efefef"
  ]
-    k`);
+`);
 
 for (let i in n) {
     let bgcolor = n[i].name == "humn" ? ` fontcolor="#ee0000"`: "";

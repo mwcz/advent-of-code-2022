@@ -28,6 +28,6 @@ serde_json = "1.0.89"
 # panic = "abort" 
 
 [features]
-default = []
-# default = ["visualize"]
+# default = []
+default = ["visualize"]
 visualize = []

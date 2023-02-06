@@ -1,4 +1,9 @@
+use std::time::Duration;
+
 use aoc_runner_derive::aoc;
+
+#[cfg(feature = "visualize")]
+use console_engine::{ConsoleEngine, KeyCode};
 
 #[derive(Debug, PartialEq)]
 pub struct Supplies<const STACK_COUNT: usize> {
@@ -72,6 +77,46 @@ impl<const STACK_COUNT: usize> Supplies<STACK_COUNT> {
     }
 
     fn rearrange_9001(&mut self) {
+        #[cfg(feature = "visualize")]
+        let print_grid = |stacks: &Vec<Vec<char>>, engine: &mut ConsoleEngine| {
+            engine.wait_frame();
+            engine.clear_screen();
+
+            let mut output: Vec<String> = Vec::new();
+
+            // find the tallest stack height H
+            // loop over i from H to 0 and print the char from each stack that has a char at that i
+            // label the stacks at the bottom
+
+            let height = stacks.iter().map(|s| s.len()).max().unwrap();
+
+            for h in (0..height).rev() {
+                let mut line: Vec<String> = Vec::new();
+                for s in stacks {
+                    line.push(match s.get(h) {
+                        Some(c) => format!("[{}] ", c),
+                        None => "    ".into(),
+                    });
+                }
+                output.push(line.join(""));
+            }
+
+            // add number labels to the stacks
+            output.push((1..=stacks.len()).map(|n| format!(" {}  ", n)).collect());
+
+            engine.print(0, (engine.get_height() - (height as u32)) as i32 - 2, &output.join("\n"));
+            engine.draw();
+        };
+
+        #[cfg(feature = "visualize")]
+        let fps = 4;
+        #[cfg(feature = "visualize")]
+        let term_height = 48; // this is enough to hold the characters up until the maximum height
+                              // any of the stacks receives given my input.
+        #[cfg(feature = "visualize")]
+        let mut engine =
+            ConsoleEngine::init((self.stacks.len() as u32) * 4, term_height, fps).unwrap();
+
         for mov in &self.moves {
             let from_len = self.stacks[mov.from].len();
 
@@ -83,8 +128,19 @@ impl<const STACK_COUNT: usize> Supplies<STACK_COUNT> {
                     .pop()
                     .expect("can't move crate that doesn't exist");
                 self.stacks[mov.to].push(from_crate);
+
+                #[cfg(feature = "visualize")]
+                if engine.is_key_pressed(KeyCode::Char('q')) {
+                    break;
+                }
+                #[cfg(feature = "visualize")]
+                print_grid(&self.stacks, &mut engine);
             }
         }
+
+        // keep the final on-screen for a bit before exiting
+        #[cfg(feature = "visualize")]
+        std::thread::sleep(Duration::from_millis(2000));
     }
 
     fn top_crates(&self) -> [char; STACK_COUNT] {
@@ -98,56 +154,60 @@ impl<const STACK_COUNT: usize> Supplies<STACK_COUNT> {
     }
 }
 
-#[aoc(day5, part1)]
-fn part1_solve(input: &str) -> String {
-    let mut supplies = Supplies::<9>::parse(input);
+fn part1_solve<const STACK_COUNT: usize>(input: &str) -> String {
+    let mut supplies = Supplies::<STACK_COUNT>::parse(input);
 
     supplies.rearrange_9000();
 
     supplies.top_crates().iter().cloned().collect()
 }
+#[aoc(day5, part1)]
+fn part1_solver(input: &str) -> String {
+    part1_solve::<9>(input)
+}
 
-#[aoc(day5, part2)]
-fn part2_solve(input: &str) -> String {
-    let mut supplies = Supplies::<9>::parse(input);
+fn part2_solve<const STACK_COUNT: usize>(input: &str) -> String {
+    let mut supplies = Supplies::<STACK_COUNT>::parse(input);
 
     supplies.rearrange_9001();
 
     supplies.top_crates().iter().cloned().collect()
+}
+#[aoc(day5, part2)]
+fn part2_solver(input: &str) -> String {
+    part2_solve::<9>(input)
 }
 
 #[cfg(test)]
 mod day5_tests {
     use super::*;
 
-    const SAMPLE_INPUT: &str = "    [D]    \n\
-                                [N] [C]    \n\
-                                [Z] [M] [P]\n\
-                                 1   2   3 \n\
-                                \n\
-                                move 1 from 2 to 1\n\
-                                move 3 from 1 to 3\n\
-                                move 2 from 2 to 1\n\
-                                move 1 from 1 to 2";
+    const REAL: &str = include_str!("../input/2022/day5.txt");
+
+    const EX: &str = "    [D]    \n\
+                      [N] [C]    \n\
+                      [Z] [M] [P]\n\
+                       1   2   3 \n\
+                      \n\
+                      move 1 from 2 to 1\n\
+                      move 3 from 1 to 3\n\
+                      move 2 from 2 to 1\n\
+                      move 1 from 1 to 2";
 
     #[test]
-    fn part1_parse_test() {
-        #[rustfmt::skip]
-        assert_eq!(
-            Supplies::<3>::parse(SAMPLE_INPUT),
-            Supplies {
-                stacks: vec![
-                    vec!['Z', 'N'],
-                    vec!['M', 'C', 'D'],
-                    vec!['P'],
-                ],
-                moves: vec![
-                    Move { count: 1, from: 1, to: 0 },
-                    Move { count: 3, from: 0, to: 2 },
-                    Move { count: 2, from: 1, to: 0 },
-                    Move { count: 1, from: 0, to: 1 },
-                ]
-            }
-        );
+    fn day5_part1_ex() {
+        assert_eq!(part1_solve::<3>(EX), "CMZ");
+    }
+    #[test]
+    fn day5_part1_real() {
+        assert_eq!(part1_solve::<9>(REAL), "LBLVVTVLP");
+    }
+    #[test]
+    fn day5_part2_ex() {
+        assert_eq!(part2_solve::<3>(EX), "MCD");
+    }
+    #[test]
+    fn day5_part2_real() {
+        assert_eq!(part2_solve::<9>(REAL), "TPFFBDRJD");
     }
 }
