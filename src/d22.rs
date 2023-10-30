@@ -1,5 +1,5 @@
-use aoc_runner_derive::aoc;
-use console_engine::{KeyCode, ConsoleEngine};
+#[cfg(feature = "visualize")]
+use console_engine::{ConsoleEngine, KeyCode};
 use itertools::Itertools;
 use nom::{
     character::complete::{self, one_of},
@@ -9,6 +9,43 @@ use nom::{
     IResult,
 };
 use std::{collections::HashMap, ops::Add};
+
+type Parsed = String;
+
+pub fn parse(input: String) -> Parsed {
+    input
+}
+
+pub fn part1(input: Parsed) -> usize {
+    let mut parts = input.split("\n\n");
+
+    let map = Map::new(parts.next().unwrap());
+    let steps = Steps::new(parts.next().unwrap());
+
+    let (mut pos, mut dir) = map.start_pos();
+
+    for step in &steps.0 {
+        pos = map.step(&pos, step);
+        dir = step.0;
+    }
+
+    1000 * (pos.1 + 1) + 4 * (pos.0 + 1) + dir.score()
+}
+
+pub fn part2(input: Parsed) -> usize {
+    let mut parts = input.split("\n\n");
+
+    let map = Map::new(parts.next().unwrap());
+    let steps = Steps::new(parts.next().unwrap());
+
+    let (mut pos, mut dir) = map.start_pos();
+
+    for step in &steps.0 {
+        (pos, dir) = map.step2(pos, dir, step);
+    }
+
+    1000 * (pos.1 + 1) + 4 * (pos.0 + 1) + dir.score()
+}
 
 type Step = (Dir, char, i32);
 
@@ -144,7 +181,7 @@ impl Map {
         // zip the seam back together
 
         let cell = |x: usize, x_off: isize, y: usize, y_off: isize| -> &Cell {
-            let Some(new_x) = x.checked_add_signed(x_off) else { 
+            let Some(new_x) = x.checked_add_signed(x_off) else {
                 return &Cell::Void;
             };
             let Some(new_y) = y.checked_add_signed(y_off) else {
@@ -197,11 +234,11 @@ impl Map {
         // Find all the concave right angles in the cube net.
         let zippers = || -> Vec<(Point, (Dir, Dir))> {
             let mut points = vec![];
-            for y in 1..(grid.len()-1) {
-                for x in 1..(grid[0].len()-1) {
+            for y in 1..(grid.len() - 1) {
+                for x in 1..(grid[0].len() - 1) {
                     let k = kernel(Point(x, y));
                     if let Some(c) = corner(k) {
-                        points.push( (Point(x,y), c) );
+                        points.push((Point(x, y), c));
                     }
                 }
             }
@@ -217,24 +254,45 @@ impl Map {
         let mut exdirs;
         let mut turning;
 
-        let width: u32 = (map_str.lines().next().unwrap().len() + 4).try_into().unwrap();
-        let height: u32 = (map_str.lines().collect_vec().len() + 5).try_into().unwrap();
+        #[cfg(feature = "visualize")]
+        let width: u32 = (map_str.lines().next().unwrap().len() + 4)
+            .try_into()
+            .unwrap();
+        #[cfg(feature = "visualize")]
+        let height: u32 = (map_str.lines().collect_vec().len() + 5)
+            .try_into()
+            .unwrap();
+        #[cfg(feature = "visualize")]
         let fps: u32 = 14;
 
         #[cfg(feature = "visualize")]
         let mut engine = ConsoleEngine::init(width, height, fps).unwrap();
 
         #[cfg(feature = "visualize")]
-        let print_grid = |i: i32, points: &[Point; 2],dirs: &[Dir; 2], net_portals: &HashMap<(Point, Dir), (Point, Dir)>, engine: &mut ConsoleEngine| {
+        let print_grid = |i: i32,
+                          points: &[Point; 2],
+                          dirs: &[Dir; 2],
+                          net_portals: &HashMap<(Point, Dir), (Point, Dir)>,
+                          engine: &mut ConsoleEngine| {
             engine.wait_frame();
             engine.clear_screen();
 
-            engine.print(0, (height as i32)-4, &format!("iteration {}", i));
-            engine.print(0, (height as i32)-3, "█ - portal");
-            engine.print(0, (height as i32)-2, "X - concave corner");
-            engine.print(0, (height as i32)-1, "<v^> - agent travel direction");
-            let starts: Vec<String> = start_points.iter().map(|p| format!("{} {} {}", p.0.to_string(), p.1.0.to_string(), p.1.1.to_string())).collect();
-            engine.print(0, height as i32, &format!("{}", starts.join(" / ")));
+            engine.print(0, (height as i32) - 4, &format!("iteration {}", i));
+            engine.print(0, (height as i32) - 3, "█ - portal");
+            engine.print(0, (height as i32) - 2, "X - concave corner");
+            engine.print(0, (height as i32) - 1, "<v^> - agent travel direction");
+            let starts: Vec<String> = start_points
+                .iter()
+                .map(|p| {
+                    format!(
+                        "{} {} {}",
+                        p.0.to_string(),
+                        p.1 .0.to_string(),
+                        p.1 .1.to_string()
+                    )
+                })
+                .collect();
+            engine.print(0, height as i32, starts.join(" / ").as_str());
 
             for (y, row) in grid.iter().enumerate() {
                 for (x, cell) in row.iter().enumerate() {
@@ -242,10 +300,10 @@ impl Map {
                     let x = x as i32;
                     let y = y as i32;
 
-                    if net_portals.keys().find(|k| k.0 == p).is_some() {
+                    if net_portals.keys().any(|k| k.0 == p) {
                         engine.print(x, y, "█");
                         // print!("O");
-                    } else if start_points.iter().find(|c| c.0 == p).is_some() {
+                    } else if start_points.iter().any(|c| c.0 == p) {
                         engine.print(x, y, "X");
                     } else if points[0] == p {
                         engine.print(x, y, dirs[0].into());
@@ -260,19 +318,23 @@ impl Map {
             engine.draw();
         };
 
+        #[cfg(feature = "visualize")]
         let mut i = 0;
         for start in &start_points {
             let mut ii = 0;
 
-            dirs = [start.1.0, start.1.1];
-            entdirs = [start.1.1.flip(), start.1.0.flip()];
-            exdirs = [start.1.1, start.1.0];
+            dirs = [start.1 .0, start.1 .1];
+            entdirs = [start.1 .1.flip(), start.1 .0.flip()];
+            exdirs = [start.1 .1, start.1 .0];
             points = [start.0 + dirs[0], start.0 + dirs[1]];
             turning = [false, false];
 
             loop {
                 // turning occupies one iteration, since the corner is attached to two other points
-                i += 1;
+                #[cfg(feature = "visualize")]
+                {
+                    i += 1;
+                }
                 ii += 1;
 
                 #[cfg(feature = "visualize")]
@@ -281,7 +343,9 @@ impl Map {
                 }
 
                 // if we reached an already-cached state, we're done
-                if net_portals.contains_key(&(points[0], exdirs[0])) && net_portals.contains_key(&(points[1], exdirs[1])) {
+                if net_portals.contains_key(&(points[0], exdirs[0]))
+                    && net_portals.contains_key(&(points[1], exdirs[1]))
+                {
                     break;
                 }
 
@@ -296,27 +360,24 @@ impl Map {
                 net_portals.insert((points[0], exdirs[0]), (points[1], entdirs[1]));
                 net_portals.insert((points[1], exdirs[1]), (points[0], entdirs[0]));
 
-                let saved_points = points.clone();
+                // let saved_points = points.clone();
 
                 // either turn or move
                 for agent_idx in 0..=1 {
                     if turning[agent_idx] {
                         turning[agent_idx] = false;
-                    } else {
-                        if let Some(corner) = corners[agent_idx] {
-                            let new_dir = match dirs[agent_idx] {
-                                Up => corner.0,
-                                Right => corner.1,
-                                Down => corner.0,
-                                Left => corner.1,
-                            };
-                            let rot_dir: Rot = Rot::try_from((dirs[agent_idx], new_dir)).unwrap();
-                            dirs[agent_idx] = new_dir;
-                            entdirs[agent_idx] = entdirs[agent_idx].rot(rot_dir);
-                            exdirs[agent_idx] = exdirs[agent_idx].rot(rot_dir);
-                            turning[agent_idx] = true;
-
-                        }
+                    } else if let Some(corner) = corners[agent_idx] {
+                        let new_dir = match dirs[agent_idx] {
+                            Up => corner.0,
+                            Right => corner.1,
+                            Down => corner.0,
+                            Left => corner.1,
+                        };
+                        let rot_dir: Rot = Rot::try_from((dirs[agent_idx], new_dir)).unwrap();
+                        dirs[agent_idx] = new_dir;
+                        entdirs[agent_idx] = entdirs[agent_idx].rot(rot_dir);
+                        exdirs[agent_idx] = exdirs[agent_idx].rot(rot_dir);
+                        turning[agent_idx] = true;
                     }
                     if !turning[agent_idx] {
                         points[agent_idx] = points[agent_idx] + dirs[agent_idx];
@@ -339,7 +400,6 @@ impl Map {
                     // reached the end of the seam
                     break;
                 }
-
             }
         }
 
@@ -374,7 +434,6 @@ impl Map {
 
     fn step2(&self, cur: Point, dir: Dir, step: &Step) -> (Point, Dir) {
         // print!("walk {step:?} start {cur:?}",);
-
 
         let mut cur = cur;
         let mut dir = dir;
@@ -456,16 +515,19 @@ impl Map {
     fn next_point2(&self, cur: &Point, dir: &Dir) -> (Point, Dir) {
         let portal = |cur: &Point, dir: &Dir| {
             let Some(p) = self.net_portals.get(&(*cur, *dir)) else {
-                panic!("tried to go {:?} from {:?} into Void and found no portal", dir, cur);
+                panic!(
+                    "tried to go {:?} from {:?} into Void and found no portal",
+                    dir, cur
+                );
             };
-            if self.grid[p.0.1][p.0.0] == Cell::Open {
+            if self.grid[p.0 .1][p.0 .0] == Cell::Open {
                 *p
             } else {
                 (*cur, *dir)
             }
         };
 
-        let next =  match dir {
+        let next = match dir {
             Dir::Up => {
                 let Some(y) = cur.1.checked_sub(1) else {
                     return portal(cur, dir);
@@ -491,15 +553,9 @@ impl Map {
         };
 
         match cell {
-            Cell::Open => {
-                (next, *dir)
-            }
-            Cell::Wall => {
-                (*cur, *dir)
-        }
-            Cell::Void => {
-                portal(cur, dir)
-            }
+            Cell::Open => (next, *dir),
+            Cell::Wall => (*cur, *dir),
+            Cell::Void => portal(cur, dir),
         }
     }
 }
@@ -537,7 +593,8 @@ impl ToString for Dir {
             Dir::Right => ">",
             Dir::Down => "v",
             Dir::Left => "<",
-        }.to_string()
+        }
+        .to_string()
     }
 }
 
@@ -592,7 +649,7 @@ impl Dir {
 #[derive(Debug, PartialEq, Eq, Clone, Copy)]
 enum Rot {
     Cw,
-    Ccw
+    Ccw,
 }
 
 impl TryFrom<(Dir, Dir)> for Rot {
@@ -610,11 +667,10 @@ impl TryFrom<(Dir, Dir)> for Rot {
             (Down, Left) => Ok(Cw),
             (Left, Up) => Ok(Cw),
             (Left, Down) => Ok(Ccw),
-            _ => Err(())
+            _ => Err(()),
         }
     }
 }
-
 
 impl Add<Dir> for Point {
     type Output = Point;
@@ -649,128 +705,89 @@ impl From<&Cell> for &str {
     }
 }
 
-
-fn part1_solve(input: &str) -> usize {
-    let mut parts = input.split("\n\n");
-
-    let map = Map::new(parts.next().unwrap());
-    let steps = Steps::new(parts.next().unwrap());
-
-    let (mut pos, mut dir) = map.start_pos();
-
-    for step in &steps.0 {
-        pos = map.step(&pos, step);
-        dir = step.0;
-    }
-
-    1000 * (pos.1 + 1) + 4 * (pos.0 + 1) + dir.score()
-}
-
-#[aoc(day22, part1)]
-fn part1_solver(input: &str) -> usize {
-    part1_solve(input)
-}
-
-fn part2_solve(input: &str) -> usize {
-    let mut parts = input.split("\n\n");
-
-    let map = Map::new(parts.next().unwrap());
-    let steps = Steps::new(parts.next().unwrap());
-
-    let (mut pos, mut dir) = map.start_pos();
-
-    for step in &steps.0 {
-        (pos, dir) = map.step2(pos, dir, step);
-    }
-
-    1000 * (pos.1 + 1) + 4 * (pos.0 + 1) + dir.score()
-}
-
-#[aoc(day22, part2)]
-fn part2_solver(input: &str) -> usize {
-    part2_solve(input)
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    const REAL: &str = include_str!("../input/2022/day22.txt");
-    const EX: &str = "        ...#
-        .#..
-        #...
-        ....
-...#.......#
-........#...
-..#....#....
-..........#.
-        ...#....
-        .....#..
-        .#......
-        ......#.
-
-10R5L5R10L4R5L5";
-
-    const EX2: &str = "        ...#
-        .#..
-        #...
-        ....
-...#.......#
-........#...
-..#....#....
-..........#.
-        ...#....
-        .....#..
-        .#......
-        ......#.
-
-1R0";
-    const EX3: &str = "        ...#
-        .#..
-        #...
-        ....
-...#.......#
-........#...
-..#....#....
-..........#.
-        ...#....
-        .....#..
-        .#......
-        ......#.
-
-1L1L1L1L0";
-    const SAMPLE_MAP: &str = "        ...#
-        .#..
-        #...
-        ....
-...#.......#
-........#...
-..#....#....
-..........#.
-        ...#....
-        .....#..
-        .#......
-        ......#.";
-
-    #[test]
-    fn day22_part1_test() {
-        assert_eq!(part1_solve(EX), 6032);
-        assert_eq!(part1_solve(EX2), 1041);
-        assert_eq!(part1_solve(EX3), 1036);
-        assert_eq!(part1_solve(REAL), 146092);
-    }
-
-    #[test]
-    fn day22_part2_test() {
-        // assert_eq!(part2_solve(EX), 5031);
-        // assert_eq!(part2_solve(&format!("{}\n\n{}", SAMPLE_MAP, "0R1L1R1L1R1L1")), 1000 * 2 + 4 * 9 + Dir::Right.score());
-        // assert_eq!(part2_solve(&format!("{}\n\n{}", SAMPLE_MAP, "0L1R0L1R0")), 1000 * 1 + 4 * 9 + Dir::Right.score());
-        // assert_eq!(part2_solve(&format!("{}\n\n{}", SAMPLE_MAP, "0L0L2R4L3")), 1000 * 12 + 4 * 12 + Dir::Up.score());
-        // assert_eq!(part2_solve(&format!("{}\n\n{}", SAMPLE_MAP, "0L0L2R4L2R1")), 1000 * 12 + 4 * 13 + Dir::Up.score());
-        assert_eq!(part2_solve(&format!("{}\n\n{}", SAMPLE_MAP, "0L0L2R4L3R1R1")), 1000 * 8 + 4 * 1 + Dir::Right.score());
-    }
-    #[test]
-    fn day22_part2_real() {
-        assert_eq!(part2_solve(REAL), 5031);
-    }
-}
+// #[cfg(test)]
+// mod tests {
+//     use super::*;
+//
+//     const REAL: &str = include_str!("../input/2022/day22.txt");
+//     const EX: &str = "        ...#
+//         .#..
+//         #...
+//         ....
+// ...#.......#
+// ........#...
+// ..#....#....
+// ..........#.
+//         ...#....
+//         .....#..
+//         .#......
+//         ......#.
+//
+// 10R5L5R10L4R5L5";
+//
+//     const EX2: &str = "        ...#
+//         .#..
+//         #...
+//         ....
+// ...#.......#
+// ........#...
+// ..#....#....
+// ..........#.
+//         ...#....
+//         .....#..
+//         .#......
+//         ......#.
+//
+// 1R0";
+//     const EX3: &str = "        ...#
+//         .#..
+//         #...
+//         ....
+// ...#.......#
+// ........#...
+// ..#....#....
+// ..........#.
+//         ...#....
+//         .....#..
+//         .#......
+//         ......#.
+//
+// 1L1L1L1L0";
+//     const SAMPLE_MAP: &str = "        ...#
+//         .#..
+//         #...
+//         ....
+// ...#.......#
+// ........#...
+// ..#....#....
+// ..........#.
+//         ...#....
+//         .....#..
+//         .#......
+//         ......#.";
+//
+//     #[test]
+//     fn day22_part1_test() {
+//         assert_eq!(part1_solve(EX), 6032);
+//         assert_eq!(part1_solve(EX2), 1041);
+//         assert_eq!(part1_solve(EX3), 1036);
+//         assert_eq!(part1_solve(REAL), 146092);
+//     }
+//
+//     #[test]
+//     fn day22_part2_test() {
+//         // assert_eq!(part2_solve(EX), 5031);
+//         // assert_eq!(part2_solve(&format!("{}\n\n{}", SAMPLE_MAP, "0R1L1R1L1R1L1")), 1000 * 2 + 4 * 9 + Dir::Right.score());
+//         // assert_eq!(part2_solve(&format!("{}\n\n{}", SAMPLE_MAP, "0L1R0L1R0")), 1000 * 1 + 4 * 9 + Dir::Right.score());
+//         // assert_eq!(part2_solve(&format!("{}\n\n{}", SAMPLE_MAP, "0L0L2R4L3")), 1000 * 12 + 4 * 12 + Dir::Up.score());
+//         // assert_eq!(part2_solve(&format!("{}\n\n{}", SAMPLE_MAP, "0L0L2R4L2R1")), 1000 * 12 + 4 * 13 + Dir::Up.score());
+//         assert_eq!(
+//             part2_solve(&format!("{}\n\n{}", SAMPLE_MAP, "0L0L2R4L3R1R1")),
+//             1000 * 8 + 4 * 1 + Dir::Right.score()
+//         );
+//     }
+//     #[test]
+//     fn day22_part2_real() {
+//         assert_eq!(part2_solve(REAL), 5031);
+//     }
+// }

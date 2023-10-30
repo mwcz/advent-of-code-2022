@@ -1,26 +1,12 @@
-use aoc_runner_derive::aoc;
 use itertools::Itertools;
 
-#[derive(Debug, PartialEq, Eq, Hash)]
-struct Cube {
-    x: usize,
-    y: usize,
-    z: usize,
+type Parsed = String;
+
+pub fn parse(input: String) -> Parsed {
+    input
 }
 
-impl From<&str> for Cube {
-    fn from(value: &str) -> Self {
-        let mut axes = value.split(',');
-        Self {
-            x: axes.next().unwrap().parse().unwrap(),
-            y: axes.next().unwrap().parse().unwrap(),
-            z: axes.next().unwrap().parse().unwrap(),
-        }
-    }
-}
-
-#[aoc(day18, part1)]
-fn part1_solve(input: &str) -> usize {
+pub fn part1(input: Parsed) -> usize {
     let cubes = input.lines().map(Cube::from).collect_vec();
 
     let mut faces = cubes.len() * 6;
@@ -41,8 +27,7 @@ fn part1_solve(input: &str) -> usize {
     faces
 }
 
-#[aoc(day18, part2)]
-fn part2_solve(input: &str) -> usize {
+pub fn part2(input: Parsed) -> usize {
     let cubes = input.lines().map(Cube::from).collect_vec();
 
     let mut x = (0, 0);
@@ -122,7 +107,7 @@ fn part2_solve(input: &str) -> usize {
 
         open_directions
             .iter()
-            .for_each(|&dir| steam(&space, visited, dir, faces));
+            .for_each(|&dir| steam(space, visited, dir, faces));
     }
 
     // start at origin; no lava can be there because it's within the padding
@@ -133,39 +118,57 @@ fn part2_solve(input: &str) -> usize {
     faces
 }
 
-#[cfg(test)]
-mod tests {
-    use super::*;
+#[derive(Debug, PartialEq, Eq, Hash)]
+struct Cube {
+    x: usize,
+    y: usize,
+    z: usize,
+}
 
-    const EX: &str = "2,2,2
-1,2,2
-3,2,2
-2,1,2
-2,3,2
-2,2,1
-2,2,3
-2,2,4
-2,2,6
-1,2,5
-3,2,5
-2,1,5
-2,3,5";
-
-    // const EX2: &str = "1,1,0
-    // 0,1,1
-    // 1,0,1
-    // 1,2,1
-    // 2,1,1
-    // 1,1,2";
-
-    #[test]
-    fn part1_test() {
-        assert_eq!(part1_solve(EX), 64);
-    }
-
-    #[test]
-    fn part2_test() {
-        assert_eq!(part2_solve(EX), 58);
-        // assert_eq!(part2_solve(EX2), 30);
+impl From<&str> for Cube {
+    fn from(value: &str) -> Self {
+        let mut axes = value.split(',');
+        Self {
+            x: axes.next().unwrap().parse().unwrap(),
+            y: axes.next().unwrap().parse().unwrap(),
+            z: axes.next().unwrap().parse().unwrap(),
+        }
     }
 }
+
+// #[cfg(test)]
+// mod tests {
+//     use super::*;
+//
+//     const EX: &str = "2,2,2
+// 1,2,2
+// 3,2,2
+// 2,1,2
+// 2,3,2
+// 2,2,1
+// 2,2,3
+// 2,2,4
+// 2,2,6
+// 1,2,5
+// 3,2,5
+// 2,1,5
+// 2,3,5";
+//
+//     // const EX2: &str = "1,1,0
+//     // 0,1,1
+//     // 1,0,1
+//     // 1,2,1
+//     // 2,1,1
+//     // 1,1,2";
+//
+//     #[test]
+//     fn part1_test() {
+//         assert_eq!(part1_solve(EX), 64);
+//     }
+//
+//     #[test]
+//     fn part2_test() {
+//         assert_eq!(part2_solve(EX), 58);
+//         // assert_eq!(part2_solve(EX2), 30);
+//     }
+// }

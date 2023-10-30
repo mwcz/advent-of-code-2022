@@ -1,9 +1,12 @@
 use std::collections::HashMap;
 
-use aoc_runner_derive::aoc;
+type Parsed = String;
 
-#[aoc(day9, part1)]
-fn part1_solve(input: &str) -> usize {
+pub fn parse(input: String) -> Parsed {
+    input
+}
+
+pub fn part1(input: Parsed) -> usize {
     let mut hx = 0;
     let mut hy = 0;
     let mut tx = 0;
@@ -57,8 +60,7 @@ fn part1_solve(input: &str) -> usize {
     visited.len()
 }
 
-#[aoc(day9, part2)]
-fn part2_solve(input: &str) -> usize {
+pub fn part2(input: Parsed) -> usize {
     let mut segs: [(i32, i32); 10] = [(0, 0); 10];
 
     let mut visited: HashMap<(i32, i32), bool> = HashMap::new();
@@ -144,7 +146,7 @@ D 1
 L 5
 R 2";
 
-    assert_eq!(part1_solve(ex), 13);
+    assert_eq!(part1(ex.to_string()), 13);
 }
 
 #[test]
@@ -158,5 +160,5 @@ D 10
 L 25
 U 20";
 
-    assert_eq!(part2_solve(ex), 36);
+    assert_eq!(part2(ex.to_string()), 36);
 }

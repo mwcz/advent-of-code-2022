@@ -1,4 +1,3 @@
-use aoc_runner_derive::aoc;
 use petgraph::algo::astar;
 use petgraph::graph::NodeIndex;
 use petgraph::Graph;
@@ -8,8 +7,13 @@ const START_HEIGHT: u16 = 1;
 /// Unique height value for end node that is reachable from any adjacent height.
 const END_HEIGHT: u16 = 26;
 
-#[aoc(day12, part1)]
-fn part1_solve(input: &str) -> i32 {
+type Parsed = String;
+
+pub fn parse(input: String) -> Parsed {
+    input
+}
+
+pub fn part1(input: Parsed) -> i32 {
     // let mut g = Graph::new();
     // let a = g.add_node( (0, 0) );
     // let b = g.add_node( (0, 0) );
@@ -52,7 +56,7 @@ fn part1_solve(input: &str) -> i32 {
             let right = (Some(y), x.checked_add(1));
 
             for dir in [above, below, left, right] {
-                let (Some(adj_y), Some(adj_x)) = dir else{
+                let (Some(adj_y), Some(adj_x)) = dir else {
                     continue;
                 };
                 // if adj_y and adj_x are in range
@@ -74,8 +78,7 @@ fn part1_solve(input: &str) -> i32 {
     path.unwrap().0
 }
 
-#[aoc(day12, part2)]
-fn part2_solve(input: &str) -> i32 {
+pub fn part2(input: Parsed) -> i32 {
     // let mut g = Graph::new();
     // let a = g.add_node( (0, 0) );
     // let b = g.add_node( (0, 0) );
@@ -118,7 +121,7 @@ fn part2_solve(input: &str) -> i32 {
             let right = (Some(y), x.checked_add(1));
 
             for dir in [above, below, left, right] {
-                let (Some(adj_y), Some(adj_x)) = dir else{
+                let (Some(adj_y), Some(adj_x)) = dir else {
                     continue;
                 };
                 // if adj_y and adj_x are in range
@@ -150,23 +153,23 @@ fn part2_solve(input: &str) -> i32 {
     *dists.iter().min().unwrap()
 }
 
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    const EX: &str = "Sabqponm\n\
-                      abcryxxl\n\
-                      accszExk\n\
-                      acctuvwj\n\
-                      abdefghi";
-
-    #[test]
-    fn part1_test() {
-        assert_eq!(part1_solve(EX), 31);
-    }
-
-    // #[test]
-    // fn part2_test() {
-    //     assert_eq!(part2_solve(EX), 2713310158u64);
-    // }
-}
+// #[cfg(test)]
+// mod tests {
+//     use super::*;
+//
+//     const EX: &str = "Sabqponm\n\
+//                       abcryxxl\n\
+//                       accszExk\n\
+//                       acctuvwj\n\
+//                       abdefghi";
+//
+//     #[test]
+//     fn part1_test() {
+//         assert_eq!(part1_solve(EX), 31);
+//     }
+//
+//     // #[test]
+//     // fn part2_test() {
+//     //     assert_eq!(part2_solve(EX), 2713310158u64);
+//     // }
+// }

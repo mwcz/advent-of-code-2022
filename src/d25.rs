@@ -1,5 +1,16 @@
-use aoc_runner_derive::aoc;
-use std::collections::HashMap;
+type Parsed = String;
+
+pub fn parse(input: String) -> Parsed {
+    input
+}
+
+pub fn part1(input: Parsed) -> String {
+    ufans(input.lines().map(snafu).sum())
+}
+
+pub fn part2(_input: Parsed) -> &'static str {
+    "merry christmas!"
+}
 
 fn snafu(enc: &str) -> i128 {
     enc.chars()
@@ -21,7 +32,7 @@ fn ufans(num: i128) -> String {
     let mut num = num;
 
     while num != 0 {
-        for exp in (0..=max_exp*4).rev() {
+        for exp in (0..=max_exp * 4).rev() {
             let coefs = [-2, -1, 0, 1, 2];
             let values = coefs.map(|coef| {
                 let pow = coef * 5_i128.pow(exp);
@@ -50,20 +61,11 @@ fn ufans(num: i128) -> String {
     chars.iter().collect::<String>()
 }
 
-fn part1_solve(input: &str) -> String {
-    ufans(input.lines().map(snafu).sum())
-}
-
-#[aoc(day25, part1)]
-fn part1_solver(input: &str) -> String {
-    part1_solve(input)
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
 
-    const REAL: &str = include_str!("../input/2022/day25.txt");
+    const REAL: &str = include_str!("../input/d25");
     const EX: &str = "1=-0-2
 12111
 2=0=
@@ -142,10 +144,10 @@ mod tests {
     }
     #[test]
     fn day25_part1_example() {
-        assert_eq!(part1_solve(EX), "2=-1=0".to_string());
+        assert_eq!(part1(EX.to_string()), "2=-1=0".to_string());
     }
     #[test]
     fn day25_part1_real() {
-        assert_eq!(part1_solve(REAL), "0".to_string());
+        assert_eq!(part1(REAL.to_string()), "0".to_string());
     }
 }

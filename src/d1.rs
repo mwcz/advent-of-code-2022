@@ -1,9 +1,7 @@
-use aoc_runner_derive::{aoc, aoc_generator};
-
 type Packs = [u32; 3];
+type Parsed = Packs;
 
-#[aoc_generator(day1)]
-pub fn part1_gen(input: &str) -> Packs {
+pub fn parse(input: String) -> Parsed {
     let mut packs: [u32; 3] = [0, 0, 0];
     let mut pack: u32 = 0;
     for line in input.lines() {
@@ -26,12 +24,10 @@ pub fn part1_gen(input: &str) -> Packs {
     packs
 }
 
-#[aoc(day1, part1)]
-pub fn part1(packs: &Packs) -> u32 {
+pub fn part1(packs: Parsed) -> u32 {
     *packs.last().unwrap()
 }
 
-#[aoc(day1, part2)]
-pub fn part2(packs: &Packs) -> u32 {
+pub fn part2(packs: Parsed) -> u32 {
     packs.iter().sum()
 }

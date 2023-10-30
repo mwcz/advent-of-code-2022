@@ -1,31 +1,31 @@
-#![feature(int_roundings, hash_drain_filter)]
-
-use aoc_runner_derive::aoc_lib;
-
-pub mod day1;
-pub mod day2;
-pub mod day3;
-pub mod day4;
-pub mod day5;
-pub mod day6;
-pub mod day7;
-pub mod day8;
-pub mod day9;
-pub mod day10;
-pub mod day11;
-pub mod day12;
-pub mod day13;
-pub mod day14;
-pub mod day15;
-pub mod day16;
-pub mod day17;
-pub mod day18;
-pub mod day19;
-pub mod day20;
-pub mod day21;
-pub mod day22;
-pub mod day23;
-pub mod day24;
-pub mod day25;
-
-aoc_lib! { year = 2022 }
+#![feature(int_roundings)]
+#![allow(clippy::too_many_arguments)]
+#![allow(clippy::let_and_return)]
+#![allow(clippy::let_unit_value)]
+#![allow(unused)]
+pub mod answer;
+pub mod d1;
+pub mod d10;
+pub mod d11;
+pub mod d12;
+pub mod d13;
+pub mod d14;
+pub mod d15;
+pub mod d16;
+pub mod d17;
+pub mod d18;
+pub mod d19;
+pub mod d2;
+pub mod d20;
+pub mod d21;
+pub mod d22;
+pub mod d23;
+pub mod d24;
+pub mod d25;
+pub mod d3;
+pub mod d4;
+pub mod d5;
+pub mod d6;
+pub mod d7;
+pub mod d8;
+pub mod d9;

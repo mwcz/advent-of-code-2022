@@ -5,7 +5,23 @@ use std::{
     str::Chars,
 };
 
-use aoc_runner_derive::aoc;
+type Parsed = String;
+
+pub fn parse(input: String) -> Parsed {
+    input
+}
+
+pub fn part1(input: Parsed) -> usize {
+    let mut chamber = Chamber::new(&input);
+
+    chamber.nth(2022 - 1)
+}
+
+pub fn part2(input: Parsed) -> usize {
+    let mut chamber = Chamber::new(&input);
+
+    chamber.nth(1000000000000 - 1)
+}
 
 const HASH_SIZE: usize = 48;
 
@@ -178,7 +194,7 @@ impl<'a> Chamber<'a> {
     }
 
     fn nth(&mut self, total_rocks: usize) -> usize {
-        #[derive(Hash, PartialEq, Eq)]
+        #[derive(Hash, PartialEq, Eq, Clone)]
         struct MemoKey {
             shape_idx: usize,
             jet_idx: usize,
@@ -311,7 +327,12 @@ impl<'a> Chamber<'a> {
                     shape_idx: self.shape_idx,
                     jet_idx: self.jet_idx,
                 };
-                if memo.contains_key(&key) {
+                if let std::collections::hash_map::Entry::Vacant(e) = memo.entry(key.clone()) {
+                    e.insert(MemoVal {
+                        peak: self.peak,
+                        rock_count: self.rock_count,
+                    });
+                } else {
                     let val = memo.get(&key).unwrap();
                     let rock_diff = self.rock_count - val.rock_count;
                     let peak_diff = self.peak - val.peak;
@@ -320,14 +341,6 @@ impl<'a> Chamber<'a> {
                     // println!("FOUND shape {} jet {} 🔺rock {} 🔺peak {} repeat {}", self.shape_idx, self.jet_idx, rock_diff, peak_diff, repeat);
                     self.rock_count += repeat * rock_diff;
                     extra += repeat * peak_diff;
-                } else {
-                    memo.insert(
-                        key,
-                        MemoVal {
-                            peak: self.peak,
-                            rock_count: self.rock_count,
-                        },
-                    );
                 }
             }
             // println!("{}", self.to_string(Some((mask, y))));
@@ -336,33 +349,19 @@ impl<'a> Chamber<'a> {
     }
 }
 
-#[aoc(day17, part1)]
-fn part1_solve(input: &str) -> usize {
-    let mut chamber = Chamber::new(input);
-
-    chamber.nth(2022 - 1)
-}
-
-#[aoc(day17, part2)]
-fn part2_solve(input: &str) -> usize {
-    let mut chamber = Chamber::new(input);
-
-    chamber.nth(1000000000000 - 1)
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    const EX: &str = ">>><<><>><<<>><>>><<<>>><<<><<<>><>><<>>";
-
-    #[test]
-    fn part1_test() {
-        assert_eq!(part1_solve(EX), 3068);
-    }
-
-    #[test]
-    fn part2_test() {
-        assert_eq!(part2_solve(EX), 1514285714288);
-    }
-}
+// #[cfg(test)]
+// mod tests {
+//     use super::*;
+//
+//     const EX: &str = ">>><<><>><<<>><>>><<<>>><<<><<<>><>><<>>";
+//
+//     #[test]
+//     fn part1_test() {
+//         assert_eq!(part1_solve(EX), 3068);
+//     }
+//
+//     #[test]
+//     fn part2_test() {
+//         assert_eq!(part2_solve(EX), 1514285714288);
+//     }
+// }

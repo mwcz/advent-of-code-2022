@@ -1,4 +1,16 @@
-use aoc_runner_derive::aoc;
+type Parsed = String;
+
+pub fn parse(input: String) -> Parsed {
+    input
+}
+
+pub fn part1(input: Parsed) -> usize {
+    find_marker::<4>(&input)
+}
+
+pub fn part2(input: Parsed) -> usize {
+    find_marker::<14>(&input)
+}
 
 fn find_marker<const MARKER_LEN: usize>(line: &str) -> usize {
     let chars: Vec<char> = line.chars().collect();
@@ -21,16 +33,6 @@ fn find_marker<const MARKER_LEN: usize>(line: &str) -> usize {
     }
 
     unreachable!();
-}
-
-#[aoc(day6, part1)]
-fn part1_solve(input: &str) -> usize {
-    find_marker::<4>(input)
-}
-
-#[aoc(day6, part2)]
-fn part2_solve(input: &str) -> usize {
-    find_marker::<14>(input)
 }
 
 #[cfg(test)]

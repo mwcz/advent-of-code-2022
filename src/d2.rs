@@ -1,4 +1,48 @@
-use aoc_runner_derive::{aoc, aoc_generator};
+type Parsed = String;
+
+pub fn parse(input: String) -> Parsed {
+    input
+}
+
+fn part1_parse(input: String) -> Vec<(Move, Move)> {
+    let mut guide: Vec<(Move, Move)> = vec![];
+    for line in input.lines() {
+        let mut pair = line.split_whitespace().map(|m| m.into());
+        guide.push((pair.next().unwrap(), pair.next().unwrap()));
+    }
+    guide
+}
+
+fn part2_parse(input: String) -> Vec<(Move, Outcome)> {
+    let mut guide: Vec<(Move, Outcome)> = vec![];
+    for line in input.lines() {
+        let mut line_components = line.split_whitespace();
+        guide.push((
+            line_components.next().unwrap().into(),
+            line_components.next().unwrap().into(),
+        ));
+    }
+    guide
+}
+
+pub fn part1(input: Parsed) -> u32 {
+    let guide = part1_parse(input);
+    let mut score = 0;
+    for (theirs, yours) in guide.iter() {
+        score += yours.versus(theirs);
+    }
+    score
+}
+
+pub fn part2(input: Parsed) -> u32 {
+    let guide = part2_parse(input);
+    let mut score = 0;
+    for (theirs, outcome) in guide.iter() {
+        let yours = outcome.choose(theirs);
+        score += yours.versus(theirs);
+    }
+    score
+}
 
 enum Move {
     Rock,
@@ -43,25 +87,6 @@ impl From<&str> for Move {
     }
 }
 
-#[aoc_generator(day2, part1)]
-fn part1_gen(input: &str) -> Vec<(Move, Move)> {
-    let mut guide: Vec<(Move, Move)> = vec![];
-    for line in input.lines() {
-        let mut pair = line.split_whitespace().map(|m| m.into());
-        guide.push((pair.next().unwrap(), pair.next().unwrap()));
-    }
-    guide
-}
-
-#[aoc(day2, part1)]
-fn part1(guide: &Vec<(Move, Move)>) -> u32 {
-    let mut score = 0;
-    for (theirs, yours) in guide {
-        score += yours.versus(theirs);
-    }
-    score
-}
-
 enum Outcome {
     Win,
     Lose,
@@ -93,27 +118,4 @@ impl Outcome {
             (Outcome::Draw, Move::Scissors) => Move::Scissors,
         }
     }
-}
-
-#[aoc_generator(day2, part2)]
-fn part2_gen(input: &str) -> Vec<(Move, Outcome)> {
-    let mut guide: Vec<(Move, Outcome)> = vec![];
-    for line in input.lines() {
-        let mut line_components = line.split_whitespace();
-        guide.push((
-            line_components.next().unwrap().into(),
-            line_components.next().unwrap().into(),
-        ));
-    }
-    guide
-}
-
-#[aoc(day2, part2)]
-fn part2(guide: &Vec<(Move, Outcome)>) -> u32 {
-    let mut score = 0;
-    for (theirs, outcome) in guide {
-        let yours = outcome.choose(theirs);
-        score += yours.versus(theirs);
-    }
-    score
 }

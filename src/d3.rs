@@ -1,6 +1,60 @@
-use aoc_runner_derive::aoc;
 use num_bigint::BigUint;
 use once_cell::sync::Lazy;
+
+type Parsed = String;
+
+pub fn parse(input: String) -> Parsed {
+    input
+}
+
+pub fn part1(input: Parsed) -> usize {
+    let rucksacks = part1_parse(input.as_str());
+
+    let mut priority_sum = 0;
+
+    for rucksack in rucksacks.iter() {
+        // find the product of compartment 1's prime numbers
+        let comp1_product = product(&rucksack.1);
+
+        // check each of compartment 0's prime numbers to see if they evenly divide into
+        // compartment 1's product.  if they do, that's the prime corresponding to the item in both
+        // compartments.
+        for item in &rucksack.0 {
+            // if the prime evently divides into compartment 1's product, then the letter exists in
+            // that compartment too, so it's what we're looking for.
+            if &comp1_product % item.prime == BigUint::from(0u32) {
+                priority_sum += item.priority;
+                break;
+            }
+        }
+    }
+
+    priority_sum
+}
+
+pub fn part2(input: Parsed) -> usize {
+    let compartments = part2_parse(input.as_str());
+
+    let mut priority_sum = 0;
+
+    for triplet in compartments {
+        let comp0_product = product(&triplet[0]);
+        let comp1_product = product(&triplet[1]);
+
+        for item in &triplet[2] {
+            // if the prime evently divides into compartment 1's product, then the letter exists in
+            // that compartment too, so it's what we're looking for.
+            if &comp0_product % item.prime == BigUint::from(0u32)
+                && &comp1_product % item.prime == BigUint::from(0u32)
+            {
+                priority_sum += item.priority;
+                break;
+            }
+        }
+    }
+
+    priority_sum
+}
 
 // prime factor approach won't work because even u128 would be needed to hold the upper limit of
 // rucksack products :(
@@ -99,57 +153,6 @@ fn product(items: &Compartment) -> BigUint {
         .fold(BigUint::from(1u32), |acc, item| acc * item.prime)
 }
 
-#[aoc(day3, part1)]
-fn part1_solve(input: &str) -> usize {
-    let rucksacks = part1_parse(input);
-
-    let mut priority_sum = 0;
-
-    for rucksack in rucksacks.iter() {
-        // find the product of compartment 1's prime numbers
-        let comp1_product = product(&rucksack.1);
-
-        // check each of compartment 0's prime numbers to see if they evenly divide into
-        // compartment 1's product.  if they do, that's the prime corresponding to the item in both
-        // compartments.
-        for item in &rucksack.0 {
-            // if the prime evently divides into compartment 1's product, then the letter exists in
-            // that compartment too, so it's what we're looking for.
-            if &comp1_product % item.prime == BigUint::from(0u32) {
-                priority_sum += item.priority;
-                break;
-            }
-        }
-    }
-
-    priority_sum
-}
-
-#[aoc(day3, part2)]
-fn part2_solve(input: &str) -> usize {
-    let compartments = part2_parse(input);
-
-    let mut priority_sum = 0;
-
-    for triplet in compartments {
-        let comp0_product = product(&triplet[0]);
-        let comp1_product = product(&triplet[1]);
-
-        for item in &triplet[2] {
-            // if the prime evently divides into compartment 1's product, then the letter exists in
-            // that compartment too, so it's what we're looking for.
-            if &comp0_product % item.prime == BigUint::from(0u32)
-                && &comp1_product % item.prime == BigUint::from(0u32)
-            {
-                priority_sum += item.priority;
-                break;
-            }
-        }
-    }
-
-    priority_sum
-}
-
 #[cfg(test)]
 mod day3_tests {
     use super::*;
@@ -165,13 +168,14 @@ mod day3_tests {
     #[test]
     fn part1_solve_test() {
         assert_eq!(
-            part1_solve(
+            part1(
                 "vJrwpWtwJgWrhcsFMMfFFhFp
 jqHRNqRjqzjGDLGLrsFMfFZSrLrFZsSL
 PmmdzqPrVvPwwTWBwg
 wMqvLMZHhHMvwLHjbvcjnnSBnvTQFn
 ttgJtRGJQctTZtZT
 CrZsJsPPZsGzwwsLwLmpwMDw"
+                    .to_string()
             ),
             157
         );
@@ -180,13 +184,14 @@ CrZsJsPPZsGzwwsLwLmpwMDw"
     #[test]
     fn part2_solve_test() {
         assert_eq!(
-            part2_solve(
+            part2(
                 "vJrwpWtwJgWrhcsFMMfFFhFp
 jqHRNqRjqzjGDLGLrsFMfFZSrLrFZsSL
 PmmdzqPrVvPwwTWBwg
 wMqvLMZHhHMvwLHjbvcjnnSBnvTQFn
 ttgJtRGJQctTZtZT
 CrZsJsPPZsGzwwsLwLmpwMDw"
+                    .to_string()
             ),
             70
         );

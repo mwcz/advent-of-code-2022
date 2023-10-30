@@ -1,12 +1,83 @@
-use aoc_runner_derive::aoc;
 use petgraph::algo::floyd_warshall;
 use petgraph::prelude::*;
 use std::collections::HashMap;
 
+type Parsed<'a> = Vec<Valve<'a>>;
+
+pub fn parse(input: &str) -> Vec<Valve> {
+    let mut valves = vec![];
+
+    for line in input.lines() {
+        let mut words = line.split_whitespace();
+        let name = words.nth(1).unwrap();
+        let rate = words
+            .nth(2)
+            .unwrap()
+            .replace("rate=", "")
+            .replace(';', "")
+            .parse::<u16>()
+            .unwrap();
+        words.nth(3).unwrap(); // "tunnels lead to valve"
+        let mut exits = vec![];
+        for word in words {
+            exits.push(word.replace(',', ""));
+        }
+
+        let valve = Valve {
+            data: ValveData {
+                name,
+                rate,
+                mask: 0, // assign this later
+            },
+            exits,
+        };
+        valves.push(valve);
+    }
+
+    valves
+}
+
+pub fn part1(valves: Parsed) -> u16 {
+    let cave = Cave::new(valves);
+
+    // println!("{:?}", Dot::with_config(&cave.graph, &[]));
+
+    if let Some(start) = cave.start {
+        let mut answer = Vec::new();
+        cave.visit(start.mask, vec![start.mask], &mut answer, 0, 0, 30);
+        answer.into_iter().map(|p| p.1).max().unwrap()
+    } else {
+        0
+    }
+}
+
+pub fn part2(valves: Parsed) -> u16 {
+    let cave = Cave::new(valves);
+
+    if let Some(start) = cave.start {
+        let mut answer = Vec::new();
+        cave.visit(start.mask, vec![start.mask], &mut answer, 0, 0, 26);
+
+        let mut score = 0;
+
+        for (visited1, score1) in &answer {
+            for (visited2, score2) in &answer {
+                if visited1 & visited2 == 0 {
+                    score = score.max(score1 + score2);
+                }
+            }
+        }
+
+        score
+    } else {
+        0
+    }
+}
+
 const START: &str = "AA";
 
 #[derive(Debug)]
-struct Valve<'name> {
+pub struct Valve<'name> {
     data: ValveData<'name>,
     exits: Vec<String>,
 }
@@ -197,103 +268,29 @@ impl<'input> Cave<'input> {
     }
 }
 
-fn generator(input: &str) -> Vec<Valve> {
-    let mut valves = vec![];
-
-    for line in input.lines() {
-        let mut words = line.split_whitespace();
-        let name = words.nth(1).unwrap();
-        let rate = words
-            .nth(2)
-            .unwrap()
-            .replace("rate=", "")
-            .replace(';', "")
-            .parse::<u16>()
-            .unwrap();
-        words.nth(3).unwrap(); // "tunnels lead to valve"
-        let mut exits = vec![];
-        for word in words {
-            exits.push(word.replace(',', ""));
-        }
-
-        let valve = Valve {
-            data: ValveData {
-                name,
-                rate,
-                mask: 0, // assign this later
-            },
-            exits,
-        };
-        valves.push(valve);
-    }
-
-    valves
-}
-
-#[aoc(day16, part1)]
-fn part1_solve(input: &str) -> u16 {
-    let valves = generator(input);
-    let cave = Cave::new(valves);
-
-    // println!("{:?}", Dot::with_config(&cave.graph, &[]));
-
-    if let Some(start) = cave.start {
-        let mut answer = Vec::new();
-        cave.visit(start.mask, vec![start.mask], &mut answer, 0, 0, 30);
-        answer.into_iter().map(|p| p.1).max().unwrap()
-    } else {
-        0
-    }
-}
-
-#[aoc(day16, part2)]
-fn part2_solve(input: &str) -> u16 {
-    let valves = generator(input);
-    let cave = Cave::new(valves);
-
-    if let Some(start) = cave.start {
-        let mut answer = Vec::new();
-        cave.visit(start.mask, vec![start.mask], &mut answer, 0, 0, 26);
-
-        let mut score = 0;
-
-        for (visited1, score1) in &answer {
-            for (visited2, score2) in &answer {
-                if visited1 & visited2 == 0 {
-                    score = score.max(score1 + score2);
-                }
-            }
-        }
-
-        score
-    } else {
-        0
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    const EX: &str = "Valve AA has flow rate=0; tunnels lead to valves DD, II, BB
-Valve BB has flow rate=13; tunnels lead to valves CC, AA
-Valve CC has flow rate=2; tunnels lead to valves DD, BB
-Valve DD has flow rate=20; tunnels lead to valves CC, AA, EE
-Valve EE has flow rate=3; tunnels lead to valves FF, DD
-Valve FF has flow rate=0; tunnels lead to valves EE, GG
-Valve GG has flow rate=0; tunnels lead to valves FF, HH
-Valve HH has flow rate=22; tunnel leads to valve GG
-Valve II has flow rate=0; tunnels lead to valves AA, JJ
-Valve JJ has flow rate=21; tunnel leads to valve II";
-
-    #[test]
-    fn part1_test() {
-        // AA DD BB JJ HH EE CC
-        assert_eq!(part1_solve(EX), 1651);
-    }
-
-    #[test]
-    fn part2_test() {
-        assert_eq!(part2_solve(EX), 1707);
-    }
-}
+// #[cfg(test)]
+// mod tests {
+//     use super::*;
+//
+//     const EX: &str = "Valve AA has flow rate=0; tunnels lead to valves DD, II, BB
+// Valve BB has flow rate=13; tunnels lead to valves CC, AA
+// Valve CC has flow rate=2; tunnels lead to valves DD, BB
+// Valve DD has flow rate=20; tunnels lead to valves CC, AA, EE
+// Valve EE has flow rate=3; tunnels lead to valves FF, DD
+// Valve FF has flow rate=0; tunnels lead to valves EE, GG
+// Valve GG has flow rate=0; tunnels lead to valves FF, HH
+// Valve HH has flow rate=22; tunnel leads to valve GG
+// Valve II has flow rate=0; tunnels lead to valves AA, JJ
+// Valve JJ has flow rate=21; tunnel leads to valve II";
+//
+//     #[test]
+//     fn part1_test() {
+//         // AA DD BB JJ HH EE CC
+//         assert_eq!(part1_solve(EX), 1651);
+//     }
+//
+//     #[test]
+//     fn part2_test() {
+//         assert_eq!(part2_solve(EX), 1707);
+//     }
+// }

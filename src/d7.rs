@@ -1,6 +1,5 @@
 mod parse;
 
-use aoc_runner_derive::aoc;
 use nom::{
     bytes::complete::tag,
     character::complete::{newline, not_line_ending, space1, u32 as nom_u32},
@@ -8,6 +7,27 @@ use nom::{
     sequence::tuple,
     IResult,
 };
+
+type Parsed = String;
+
+pub fn parse(input: String) -> Parsed {
+    input
+}
+
+pub fn part1(input: Parsed) -> u32 {
+    let (_, entries) = parse::log(input.as_str()).expect("could not parse input");
+    let fs = Filesystem::new(entries);
+
+    fs.sum_under(100000)
+}
+
+pub fn part2(input: Parsed) -> u32 {
+    let (_, entries) = parse::log(input.as_str()).expect("could not parse input");
+    let fs = Filesystem::new(entries);
+
+    fs.free_up(70_000_000, 30_000_000)
+        .expect("no dir found that can free up enough space")
+}
 
 #[derive(Debug, PartialEq)]
 pub enum Log<'name> {
@@ -150,33 +170,6 @@ impl<'inode> Filesystem<'inode> {
     }
 }
 
-fn part1_solve(input: &str) -> u32 {
-    let (_, entries) = parse::log(input).expect("could not parse input");
-
-    let fs = Filesystem::new(entries);
-
-    fs.sum_under(100000)
-}
-
-#[aoc(day7, part1)]
-fn part1_solver(input: &str) -> u32 {
-    part1_solve(input)
-}
-
-fn part2_solve(input: &str) -> u32 {
-    let (_, entries) = parse::log(input).expect("could not parse input");
-
-    let fs = Filesystem::new(entries);
-
-    fs.free_up(70_000_000, 30_000_000)
-        .expect("no dir found that can free up enough space")
-}
-
-#[aoc(day7, part2)]
-fn part2_solver(input: &str) -> u32 {
-    part2_solve(input)
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -208,21 +201,21 @@ $ ls
 
     #[test]
     fn day7_part1_example() {
-        assert_eq!(part1_solve(EX), 95437);
+        assert_eq!(part1(parse(EX.into())), 95437);
     }
 
     #[test]
     fn day7_part1_real() {
-        assert_eq!(part1_solve(REAL), 1232307);
+        assert_eq!(part1(parse(REAL.into())), 1232307);
     }
 
     #[test]
     fn day7_part2_example() {
-        assert_eq!(part2_solve(EX), 24933642);
+        assert_eq!(part2(parse(EX.into())), 24933642);
     }
 
     #[test]
     fn day7_part2_real() {
-        assert_eq!(part2_solve(REAL), 7268994);
+        assert_eq!(part2(parse(REAL.into())), 7268994);
     }
 }

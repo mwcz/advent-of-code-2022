@@ -1,9 +1,38 @@
-use std::time::Duration;
-
-use aoc_runner_derive::aoc;
-
 #[cfg(feature = "visualize")]
 use console_engine::{ConsoleEngine, KeyCode};
+use std::fmt::Write;
+#[cfg(feature = "visualize")]
+use std::time::Duration;
+
+type Parsed = String;
+
+pub fn parse(input: String) -> Parsed {
+    input
+}
+
+pub fn part1(input: Parsed) -> String {
+    part1_solve::<9>(&input)
+}
+
+pub fn part2(input: Parsed) -> String {
+    part2_solve::<9>(&input)
+}
+
+fn part1_solve<const STACK_COUNT: usize>(input: &str) -> String {
+    let mut supplies = Supplies::<STACK_COUNT>::parse(input);
+
+    supplies.rearrange_9000();
+
+    supplies.top_crates().iter().cloned().collect()
+}
+
+fn part2_solve<const STACK_COUNT: usize>(input: &str) -> String {
+    let mut supplies = Supplies::<STACK_COUNT>::parse(input);
+
+    supplies.rearrange_9001();
+
+    supplies.top_crates().iter().cloned().collect()
+}
 
 #[derive(Debug, PartialEq)]
 pub struct Supplies<const STACK_COUNT: usize> {
@@ -102,7 +131,10 @@ impl<const STACK_COUNT: usize> Supplies<STACK_COUNT> {
             }
 
             // add number labels to the stacks
-            output.push((1..=stacks.len()).map(|n| format!(" {}  ", n)).collect());
+            output.push((1..=stacks.len()).fold(String::new(), |mut s, n| {
+                let _ = write!(s, " {}  ", n);
+                s
+            }));
 
             engine.print(
                 0,
@@ -113,7 +145,7 @@ impl<const STACK_COUNT: usize> Supplies<STACK_COUNT> {
         };
 
         #[cfg(feature = "visualize")]
-        let fps = 4;
+        let fps = 60;
         #[cfg(feature = "visualize")]
         let term_height = 48; // this is enough to hold the characters up until the maximum height
                               // any of the stacks receives given my input.
@@ -156,30 +188,6 @@ impl<const STACK_COUNT: usize> Supplies<STACK_COUNT> {
 
         top_crates
     }
-}
-
-fn part1_solve<const STACK_COUNT: usize>(input: &str) -> String {
-    let mut supplies = Supplies::<STACK_COUNT>::parse(input);
-
-    supplies.rearrange_9000();
-
-    supplies.top_crates().iter().cloned().collect()
-}
-#[aoc(day5, part1)]
-fn part1_solver(input: &str) -> String {
-    part1_solve::<9>(input)
-}
-
-fn part2_solve<const STACK_COUNT: usize>(input: &str) -> String {
-    let mut supplies = Supplies::<STACK_COUNT>::parse(input);
-
-    supplies.rearrange_9001();
-
-    supplies.top_crates().iter().cloned().collect()
-}
-#[aoc(day5, part2)]
-fn part2_solver(input: &str) -> String {
-    part2_solve::<9>(input)
 }
 
 #[cfg(test)]

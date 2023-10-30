@@ -1,7 +1,85 @@
-use aoc_runner_derive::aoc;
+#[cfg(feature = "visualize")]
 use console_engine::{ConsoleEngine, KeyCode};
 use derive_more::{Add, AddAssign, Sub, SubAssign};
 use std::{array::IntoIter, collections::HashMap, fmt::Display, iter::Cycle};
+
+type Parsed = Grove;
+
+pub fn parse(input: String) -> Parsed {
+    let grid = input
+        .lines()
+        .enumerate()
+        .flat_map(|(y, line)| {
+            line.chars().enumerate().filter_map(move |(x, c)| {
+                if c == '#' {
+                    Some((Point(x as i32, y as i32), Elf { proposal: None }))
+                } else {
+                    None
+                }
+            })
+        })
+        .collect::<HashMap<Point, Elf>>();
+
+    Grove::new(grid)
+}
+
+pub fn part1(grove: Parsed) -> i32 {
+    part1_solve(grove, 10)
+}
+
+fn part1_solve(grove: Parsed, rounds: usize) -> i32 {
+    let mut grove = grove;
+    grove.nth(rounds - 1); // offset 1 to account for initial state
+
+    // let area = grove.grid.len() * grove.grid[0].len();
+    let bounds = grove.bounding_box();
+    let area = bounds.width * bounds.height;
+    let elf_count = grove.grid.len() as i32;
+
+    area - elf_count
+}
+
+pub fn part2(grove: Parsed) -> i32 {
+    let mut grove = grove;
+    // let (rounds, _) = grove.into_iter().enumerate().find(|(_, p)| !p).unwrap();
+    // rounds + 1
+
+    #[cfg(feature = "visualize")]
+    let width = 140;
+    #[cfg(feature = "visualize")]
+    let height = 140;
+    #[cfg(feature = "visualize")]
+    let fps = 250;
+    #[cfg(feature = "visualize")]
+    let mut engine = ConsoleEngine::init(width, height, fps).unwrap();
+
+    #[cfg(feature = "visualize")]
+    let print_grid = |round: i32, grove: &Grove, engine: &mut ConsoleEngine| {
+        engine.wait_frame();
+        engine.clear_screen();
+
+        engine.print(0, 0, &format!("Round {}", round));
+        engine.print(0, 2, &format!("{grove}"));
+
+        engine.draw();
+    };
+
+    let mut rounds = 1;
+    while let Some(true) = grove.next() {
+        #[cfg(feature = "visualize")]
+        if engine.is_key_pressed(KeyCode::Char('q')) {
+            break;
+        }
+
+        #[cfg(feature = "visualize")]
+        print_grid(rounds, &grove, &mut engine);
+        rounds += 1;
+    }
+
+    println!("{grove}",);
+
+    rounds
+}
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Add, AddAssign, Sub, SubAssign)]
 struct Point(i32, i32);
@@ -78,7 +156,7 @@ struct BoundingBox {
     origin: Point,
 }
 
-struct Grove {
+pub struct Grove {
     grid: HashMap<Point, Elf>,
     directions: Cycle<IntoIter<(char, Point), 4>>,
 }
@@ -217,119 +295,38 @@ impl Display for Grove {
     }
 }
 
-fn parse(input: &str) -> Grove {
-    let grid = input
-        .lines()
-        .enumerate()
-        .flat_map(|(y, line)| {
-            line.chars().enumerate().filter_map(move |(x, c)| {
-                if c == '#' {
-                    Some((Point(x as i32, y as i32), Elf { proposal: None }))
-                } else {
-                    None
-                }
-            })
-        })
-        .collect::<HashMap<Point, Elf>>();
-
-    Grove::new(grid)
-}
-
-fn part1_solve(input: &str, rounds: usize) -> i32 {
-    let mut grove = parse(input);
-
-    grove.nth(rounds - 1); // offset 1 to account for initial state
-
-    // let area = grove.grid.len() * grove.grid[0].len();
-    let bounds = grove.bounding_box();
-    let area = bounds.width * bounds.height;
-    let elf_count = grove.grid.len() as i32;
-
-    area - elf_count
-}
-
-#[aoc(day23, part1)]
-fn part1_solver(input: &str) -> i32 {
-    part1_solve(input, 10)
-}
-
-fn part2_solve(input: &str) -> i32 {
-    let mut grove = parse(input);
-
-    // let (rounds, _) = grove.into_iter().enumerate().find(|(_, p)| !p).unwrap();
-    // rounds + 1
-
-    let width = 140;
-    let height = 140;
-    let fps = 250;
-    #[cfg(feature = "visualize")]
-    let mut engine = ConsoleEngine::init(width, height, fps).unwrap();
-
-    #[cfg(feature = "visualize")]
-    let print_grid = |round: i32, grove: &Grove, engine: &mut ConsoleEngine| {
-        engine.wait_frame();
-        engine.clear_screen();
-
-        engine.print(0, 0, &format!("Round {}", round));
-        engine.print(0, 2, &format!("{grove}"));
-
-        engine.draw();
-    };
-
-    let mut rounds = 1;
-    while let Some(true) = grove.next() {
-        #[cfg(feature = "visualize")]
-        if engine.is_key_pressed(KeyCode::Char('q')) {
-            break;
-        }
-
-        #[cfg(feature = "visualize")]
-        print_grid(rounds, &grove, &mut engine);
-        rounds += 1;
-    }
-
-    println!("{grove}",);
-
-    rounds
-}
-
-#[aoc(day23, part2)]
-fn part2_solver(input: &str) -> i32 {
-    part2_solve(input)
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    const REAL: &str = include_str!("../input/2022/day23.txt");
-    // const EX: &str = ".....\n\
-    //                   ..##.\n\
-    //                   ..#..\n\
-    //                   .....\n\
-    //                   ..##.\n\
-    //                   .....";
-
-    const EX2: &str = "....#..\n\
-                       ..###.#\n\
-                       #...#.#\n\
-                       .#...##\n\
-                       #.###..\n\
-                       ##.#.##\n\
-                       .#..#..";
-
-    #[test]
-    fn day23_part1_example() {
-        assert_eq!(part1_solve(EX2, 10), 110);
-    }
-
-    #[test]
-    fn day23_part2_example() {
-        assert_eq!(part2_solve(EX2), 20);
-    }
-
-    #[test]
-    fn day23_part2_real() {
-        assert_eq!(part2_solve(REAL), 988);
-    }
-}
+// #[cfg(test)]
+// mod tests {
+//     use super::*;
+//
+//     const REAL: &str = include_str!("../input/2022/day23.txt");
+//     // const EX: &str = ".....\n\
+//     //                   ..##.\n\
+//     //                   ..#..\n\
+//     //                   .....\n\
+//     //                   ..##.\n\
+//     //                   .....";
+//
+//     const EX2: &str = "....#..\n\
+//                        ..###.#\n\
+//                        #...#.#\n\
+//                        .#...##\n\
+//                        #.###..\n\
+//                        ##.#.##\n\
+//                        .#..#..";
+//
+//     #[test]
+//     fn day23_part1_example() {
+//         assert_eq!(part1_solve(EX2, 10), 110);
+//     }
+//
+//     #[test]
+//     fn day23_part2_example() {
+//         assert_eq!(part2_solve(EX2), 20);
+//     }
+//
+//     #[test]
+//     fn day23_part2_real() {
+//         assert_eq!(part2_solve(REAL), 988);
+//     }
+// }

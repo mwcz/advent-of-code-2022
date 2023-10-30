@@ -1,6 +1,26 @@
-use aoc_runner_derive::aoc;
+type Parsed = [[i8; 99]; 99];
 
-fn parse<const SIZE: usize>(input: &str) -> [[i8; SIZE]; SIZE] {
+pub fn parse(input: String) -> Parsed {
+    parse_with::<99>(input)
+}
+
+pub fn part1(trees: Parsed) -> usize {
+    let mut forest = Forest::<99> {
+        trees,
+        visible: [[false; 99]; 99],
+    };
+    forest.count_visible()
+}
+
+pub fn part2(trees: Parsed) -> usize {
+    let forest = Forest::<99> {
+        trees,
+        visible: [[false; 99]; 99],
+    };
+    forest.max_scenic()
+}
+
+fn parse_with<const SIZE: usize>(input: String) -> [[i8; SIZE]; SIZE] {
     let mut trees = [[0; SIZE]; SIZE];
     const ASCII_DEC_START: i8 = 48;
 
@@ -131,33 +151,16 @@ impl<const SIZE: usize> Forest<SIZE> {
     }
 }
 
-#[aoc(day8, part1)]
-fn part1_solve(input: &str) -> usize {
-    let mut forest = Forest::<99> {
-        trees: parse::<99>(input),
-        visible: [[false; 99]; 99],
-    };
-    forest.count_visible()
-}
-
-#[aoc(day8, part2)]
-fn part2_solve(input: &str) -> usize {
-    let forest = Forest::<99> {
-        trees: parse::<99>(input),
-        visible: [[false; 99]; 99],
-    };
-    forest.max_scenic()
-}
-
 #[test]
 fn day8_test() {
     assert_eq!(
-        parse::<5>(
+        parse_with::<5>(
             "30373\n\
              25512\n\
              65332\n\
              33549\n\
-             35390",
+             35390"
+                .to_string(),
         ),
         [
             [3, 0, 3, 7, 3,],
@@ -169,12 +172,13 @@ fn day8_test() {
     );
     assert_eq!(
         Forest::<5> {
-            trees: parse::<5>(
+            trees: parse_with::<5>(
                 "30373\n\
              25512\n\
              65332\n\
              33549\n\
-             35390",
+             35390"
+                    .to_string(),
             ),
             visible: [[false; 5]; 5],
         }
@@ -183,12 +187,13 @@ fn day8_test() {
     );
     assert_eq!(
         Forest::<5> {
-            trees: parse::<5>(
+            trees: parse_with::<5>(
                 "30373\n\
              25512\n\
              65332\n\
              33549\n\
-             35390",
+             35390"
+                    .to_string(),
             ),
             visible: [[false; 5]; 5],
         }

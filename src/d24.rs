@@ -1,9 +1,150 @@
-use aoc_runner_derive::aoc;
+#[cfg(feature = "visualize")]
 use console_engine::crossterm::style::Stylize;
+
 use derive_more::{Add, AddAssign, Sub, SubAssign};
 use itertools::Itertools;
 use pathfinding::directed::astar::astar;
 use std::fmt::Display;
+
+type Parsed = String;
+
+pub fn parse(input: String) -> Parsed {
+    input
+}
+
+pub fn part1(input: Parsed) -> i32 {
+    let mut basin = Basin::new(input);
+
+    let basins = (0..(basin.width * basin.height))
+        .map(|_| {
+            basin.step();
+            basin.clone()
+        })
+        .collect_vec();
+
+    // for pathfinding, combine the grid Point with a usize representing the iteration number.
+    // this is only because the pathfinding crate's algos refuse to revisit the same point twice,
+    // but revisiting is required to solve this problem.
+    type PathPoint = (Point, usize);
+    let start = (basin.start, 0);
+    let successors = |p: &PathPoint| -> Vec<(PathPoint, i32)> {
+        basins[p.1]
+            .moves(p.0)
+            .into_iter()
+            .map(|next| ((next, p.1 + 1), 1))
+            .collect()
+    };
+    let heuristic = |p: &PathPoint| {
+        let diff = basin.end - p.0;
+        diff.0 + diff.1
+    };
+    let success = |p: &PathPoint| p.0 == basin.end;
+
+    let answer = astar(&start, successors, heuristic, success);
+
+    answer.unwrap().1
+}
+
+pub fn part2(input: Parsed) -> i32 {
+    let mut basin = Basin::new(input);
+
+    #[cfg(feature = "visualize")]
+    let print_grid = |basin: &Basin, player: &Point, engine: &mut ConsoleEngine| {
+        engine.wait_frame();
+        engine.clear_screen();
+        let basin_out = format!("{}", basin);
+        let basin_out = basin_out
+            .lines()
+            .enumerate()
+            .map(|(y, line)| {
+                if y == player.1 as usize {
+                    line.chars()
+                        .enumerate()
+                        .map(|(x, c)| if x == player.0 as usize { '█' } else { c })
+                        .collect::<String>()
+                } else {
+                    line.to_string()
+                }
+            })
+            .collect_vec();
+        engine.print(0, 0, &basin_out.join("\n"));
+        engine.draw();
+    };
+
+    #[cfg(feature = "visualize")]
+    let fps = 30;
+    #[cfg(feature = "visualize")]
+    let mut engine = ConsoleEngine::init(basin.width as u32, basin.height as u32 + 1, fps).unwrap();
+
+    let basins = (0..3 * (basin.width * basin.height))
+        .map(|_| {
+            basin.step();
+            basin.clone()
+        })
+        .collect_vec();
+
+    // for pathfinding, combine the grid Point with a usize representing the iteration number.
+    // this is only because the pathfinding crate's algos refuse to revisit the same point twice,
+    // but revisiting is required to solve this problem.
+    type PathPoint = (Point, usize);
+    let successors = |p: &PathPoint| -> Vec<(PathPoint, i32)> {
+        let moves = basins[p.1]
+            .moves(p.0)
+            .into_iter()
+            .map(|next| ((next, p.1 + 1), 1))
+            .collect();
+        // println!("{moves:?}");
+        moves
+    };
+    let heuristic1 = |p: &PathPoint| {
+        let diff = basin.end - p.0;
+        diff.0 + diff.1
+    };
+    let heuristic2 = |p: &PathPoint| {
+        let diff = basin.start - p.0;
+        diff.0 + diff.1
+    };
+    let success1 = |p: &PathPoint| p.0 == basin.end;
+    let success2 = |p: &PathPoint| p.0 == basin.start;
+
+    // to goal
+    let start1 = (basin.start, 0);
+    let phase1 = astar(&start1, successors, heuristic1, success1).unwrap();
+
+    // back to start
+    let start2 = (basin.end, phase1.1 as usize);
+    let phase2 = astar(&start2, successors, heuristic2, success2).unwrap();
+
+    // back to goal with little elfie mcforgetful's snacks
+    let start3 = (basin.start, (phase1.1 + phase2.1) as usize);
+    let phase3 = astar(&start3, successors, heuristic1, success1).unwrap();
+
+    #[cfg(feature = "visualize")]
+    {
+        let steps = phase1
+            .0
+            .iter()
+            .chain(phase2.0.iter())
+            .chain(phase3.0.iter());
+        let mut last_step = 0;
+        for step in steps {
+            if engine.is_key_pressed(KeyCode::Char('q')) {
+                break;
+            }
+            print_grid(basins.get(step.1).unwrap(), &step.0, &mut engine);
+            last_step = step.1;
+        }
+        let last_basin = basins.get(last_step).unwrap();
+
+        // keep the animation running for a few more steps
+        for _ in 0..14 {
+            last_step += 1;
+            print_grid(basins.get(last_step).unwrap(), &last_basin.end, &mut engine);
+        }
+    }
+
+    phase1.1 + phase2.1 + phase3.1
+}
 
 #[cfg(feature = "visualize")]
 use console_engine::{ConsoleEngine, KeyCode};
@@ -28,7 +169,7 @@ struct Basin {
 }
 
 impl Basin {
-    fn new(input: &str) -> Self {
+    fn new(input: String) -> Self {
         // parse the input
 
         let mut start: Option<Point> = None;
@@ -188,9 +329,9 @@ struct Blizz {
     dir: Point,
 }
 
-impl Into<char> for &Blizz {
-    fn into(self) -> char {
-        match (self.dir.0, self.dir.1) {
+impl From<&Blizz> for char {
+    fn from(val: &Blizz) -> Self {
+        match (val.dir.0, val.dir.1) {
             (0, 1) => 'v',
             (0, -1) => '^',
             (1, 0) => '>',
@@ -227,161 +368,11 @@ impl TryFrom<&Cell> for Blizz {
     }
 }
 
-fn part1_solve(input: &str) -> i32 {
-    let mut basin = Basin::new(input);
-
-    let basins = (0..(basin.width * basin.height))
-        .into_iter()
-        .map(|_| {
-            basin.step();
-            basin.clone()
-        })
-        .collect_vec();
-
-    // for pathfinding, combine the grid Point with a usize representing the iteration number.
-    // this is only because the pathfinding crate's algos refuse to revisit the same point twice,
-    // but revisiting is required to solve this problem.
-    type PathPoint = (Point, usize);
-    let start = (basin.start, 0);
-    let successors = |p: &PathPoint| -> Vec<(PathPoint, i32)> {
-        basins[p.1]
-            .moves(p.0)
-            .into_iter()
-            .map(|next| ((next, p.1 + 1), 1))
-            .collect()
-    };
-    let heuristic = |p: &PathPoint| {
-        let diff = basin.end - p.0;
-        diff.0 + diff.1
-    };
-    let success = |p: &PathPoint| p.0 == basin.end;
-
-    let answer = astar(&start, successors, heuristic, success);
-
-    answer.unwrap().1
-}
-
-#[aoc(day24, part1)]
-fn part1_solver(input: &str) -> i32 {
-    part1_solve(input)
-}
-
-fn part2_solve(input: &str) -> i32 {
-    let mut basin = Basin::new(input);
-
-    #[cfg(feature = "visualize")]
-    let print_grid = |basin: &Basin, player: &Point, engine: &mut ConsoleEngine| {
-        engine.wait_frame();
-        engine.clear_screen();
-        let basin_out = format!("{}", basin);
-        let basin_out = basin_out
-            .lines()
-            .enumerate()
-            .map(|(y, line)| {
-                if y == player.1 as usize {
-                    line.chars()
-                        .enumerate()
-                        .map(|(x, c)| if x == player.0 as usize { '█' } else { c })
-                        .collect::<String>()
-                } else {
-                    line.to_string()
-                }
-            })
-            .collect_vec();
-        engine.print(0, 0, &basin_out.join("\n"));
-        engine.draw();
-    };
-
-    #[cfg(feature = "visualize")]
-    let fps = 30;
-    #[cfg(feature = "visualize")]
-    let mut engine = ConsoleEngine::init(basin.width as u32, basin.height as u32 + 1, fps).unwrap();
-
-    let basins = (0..3 * (basin.width * basin.height))
-        .into_iter()
-        .map(|_| {
-            basin.step();
-            basin.clone()
-        })
-        .collect_vec();
-
-    // for pathfinding, combine the grid Point with a usize representing the iteration number.
-    // this is only because the pathfinding crate's algos refuse to revisit the same point twice,
-    // but revisiting is required to solve this problem.
-    type PathPoint = (Point, usize);
-    let successors = |p: &PathPoint| -> Vec<(PathPoint, i32)> {
-        let moves = basins[p.1]
-            .moves(p.0)
-            .into_iter()
-            .map(|next| ((next, p.1 + 1), 1))
-            .collect();
-        // println!("{moves:?}");
-        moves
-    };
-    let heuristic1 = |p: &PathPoint| {
-        let diff = basin.end - p.0;
-        diff.0 + diff.1
-    };
-    let heuristic2 = |p: &PathPoint| {
-        let diff = basin.start - p.0;
-        diff.0 + diff.1
-    };
-    let success1 = |p: &PathPoint| p.0 == basin.end;
-    let success2 = |p: &PathPoint| p.0 == basin.start;
-
-    // to goal
-    let start1 = (basin.start, 0);
-    let phase1 = astar(&start1, successors, heuristic1, success1).unwrap();
-
-    // back to start
-    let start2 = (basin.end, phase1.1 as usize);
-    let phase2 = astar(&start2, successors, heuristic2, success2).unwrap();
-
-    // back to goal with little elfie mcforgetful's snacks
-    let start3 = (basin.start, (phase1.1 + phase2.1) as usize);
-    let phase3 = astar(&start3, successors, heuristic1, success1).unwrap();
-
-    #[cfg(feature = "visualize")]
-    {
-        let steps = phase1
-            .0
-            .iter()
-            .chain(phase2.0.iter())
-            .chain(phase3.0.iter());
-        let mut last_step = 0;
-        for step in steps {
-            if engine.is_key_pressed(KeyCode::Char('q')) {
-                break;
-            }
-            print_grid(basins.get(step.1).unwrap(), &step.0, &mut engine);
-            last_step = step.1;
-        }
-        let last_basin = basins.get(last_step).unwrap();
-
-        // keep the animation running for a few more steps
-        for _ in 0..14 {
-            last_step += 1;
-            print_grid(
-                &basins.get(last_step).unwrap(),
-                &last_basin.end,
-                &mut engine,
-            );
-        }
-    }
-
-    phase1.1 + phase2.1 + phase3.1
-}
-
-#[aoc(day24, part2)]
-fn part2_solver(input: &str) -> i32 {
-    part2_solve(input)
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
 
-    const REAL: &str = include_str!("../input/2022/day24.txt");
+    const REAL: &str = include_str!("../input/d24");
     const EX: &str = "#.######
 #>>.<^<#
 #.<..<<#
@@ -391,19 +382,19 @@ mod tests {
 
     #[test]
     fn day24_part1_example() {
-        assert_eq!(part1_solve(EX), 18);
+        assert_eq!(part1(EX.to_string()), 18);
     }
     #[test]
     fn day24_part1_real() {
-        assert_eq!(part1_solve(REAL), 290);
+        assert_eq!(part1(REAL.to_string()), 290);
     }
 
     #[test]
     fn day24_part2_example() {
-        assert_eq!(part2_solve(EX), 54);
+        assert_eq!(part2(EX.to_string()), 54);
     }
     #[test]
     fn day24_part2_real() {
-        assert_eq!(part2_solve(REAL), 842);
+        assert_eq!(part2(REAL.to_string()), 842);
     }
 }
