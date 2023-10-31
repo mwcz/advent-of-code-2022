@@ -4,17 +4,33 @@ use std::fs::read_to_string;
 fn main() {
     let args: Args = argh::from_env();
 
-    let input_file = if args.input.is_some() {
-        args.input.unwrap()
-    } else if args.example {
-        format!("./examples/d{}", args.day)
+    if args.day == 255 {
+        for day in 1..=25 {
+            let input =
+                read_to_string(format!("./input/d{}", day)).expect("couldn't read input file");
+            print!("day {day} part 1: ");
+            run(day, 1, input.clone());
+            print!("day {day} part 2: ");
+            run(day, 2, input.clone());
+        }
+    } else if (1..=25).contains(&args.day) {
+        let input_file = if args.input.is_some() {
+            args.input.unwrap()
+        } else if args.example {
+            format!("./examples/d{}", args.day)
+        } else {
+            format!("./input/d{}", args.day)
+        };
+
+        let input = read_to_string(input_file).expect("couldn't read input file");
+        run(args.day, args.part, input);
     } else {
-        format!("./input/d{}", args.day)
-    };
+        eprintln!("day must be 1 through 25, or 255 to run all days");
+    }
+}
 
-    let input = read_to_string(input_file).expect("couldn't read input file");
-
-    match (args.day, args.part) {
+fn run(day: u8, part: u8, input: String) {
+    match (day, part) {
         (1, 1) => {
             let parsed = aoc2022::d1::parse(input);
             let output = aoc2022::d1::part1(parsed);
@@ -272,7 +288,7 @@ fn main() {
 /// The CLI arguments allowed.
 #[derive(FromArgs, Debug)]
 struct Args {
-    /// specifies the day
+    /// specifies the day (255 runs all parts)
     #[argh(option, short = 'd')]
     day: u8,
 
