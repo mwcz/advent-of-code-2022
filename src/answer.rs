@@ -17,3 +17,5 @@ impl Answer for u128 {}
 impl Answer for i128 {}
 impl Answer for f32 {}
 impl Answer for f64 {}
+impl Answer for usize {}
+impl Answer for isize {}

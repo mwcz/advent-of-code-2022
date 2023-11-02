@@ -5,14 +5,14 @@ use crate::answer::Answer;
 
 type Parsed = u8;
 
-pub fn parse(_input: String) -> Parsed {
+pub fn parse(input: String) -> Parsed {
     0
 }
 
-pub fn part1(_input: Parsed) -> impl Answer {
+pub fn part1(input: Parsed) -> impl Answer {
     "incomplete"
 }
 
-pub fn part2(_input: Parsed) -> impl Answer {
+pub fn part2(input: Parsed) -> impl Answer {
     "incomplete"
 }
