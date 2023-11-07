@@ -1,4 +1,3 @@
-use crate::answer::Answer;
 use std::fmt::Write as _;
 use std::str::Lines;
 
@@ -48,7 +47,7 @@ pub fn parse(input: String) -> Parsed {
     input
 }
 
-pub fn part1(input: Parsed) -> impl Answer {
+pub fn part1(input: Parsed) -> i32 {
     let mut dev = Device::new(input.lines());
 
     [20, 40, 40, 40, 40, 40]
@@ -57,7 +56,7 @@ pub fn part1(input: Parsed) -> impl Answer {
         .sum::<i32>()
 }
 
-pub fn part2(input: Parsed) -> impl Answer {
+pub fn part2(input: Parsed) -> String {
     let mut dev = Device::new(input.lines());
     let mut answer = String::from("\n");
 
