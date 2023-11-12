@@ -1,3 +1,6 @@
+# This line needs to come before anything else in Cargo.toml
+cargo-features = ["codegen-backend"]
+
 [package]
 name = "aoc2022"
 version = "0.1.0"
@@ -26,6 +29,9 @@ serde_json = "1.0.89"
 # lto = true    
 # strip = true  
 # panic = "abort" 
+
+[profile.dev]
+codegen-backend = "cranelift"
 
 [features]
 default = []
