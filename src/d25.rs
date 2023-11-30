@@ -35,7 +35,7 @@ fn ufans(num: i128) -> String {
         for exp in (0..=max_exp * 4).rev() {
             let coefs = [-2, -1, 0, 1, 2];
             let values = coefs.map(|coef| {
-                let pow = coef * 5_i128.pow(exp);
+                let pow = coef * 5_i128.wrapping_pow(exp);
                 let dist = (num - pow).abs();
                 (coef, pow, dist, exp)
             });
