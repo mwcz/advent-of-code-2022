@@ -194,7 +194,7 @@ impl<const STACK_COUNT: usize> Supplies<STACK_COUNT> {
 mod day5_tests {
     use super::*;
 
-    const REAL: &str = include_str!("../input/2022/day5.txt");
+    const REAL: &str = include_str!("../input/d5");
 
     const EX: &str = "    [D]    \n\
                       [N] [C]    \n\

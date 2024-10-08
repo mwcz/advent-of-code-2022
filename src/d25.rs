@@ -148,6 +148,6 @@ mod tests {
     }
     #[test]
     fn day25_part1_real() {
-        assert_eq!(part1(REAL.to_string()), "0".to_string());
+        assert_eq!(part1(REAL.to_string()), "2-0==21--=0==2201==2".to_string());
     }
 }

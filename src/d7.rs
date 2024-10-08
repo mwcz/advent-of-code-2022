@@ -197,7 +197,7 @@ $ ls
 8033020 d.log
 5626152 d.ext
 7214296 k";
-    const REAL: &str = include_str!("../input/2022/day7.txt");
+    const REAL: &str = include_str!("../input/d7");
 
     #[test]
     fn day7_part1_example() {
